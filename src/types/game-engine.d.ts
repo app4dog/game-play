@@ -28,3 +28,19 @@ declare module '/game-engine/app4dog_game_engine.js' {
   export default function init(input?: RequestInfo | URL | Response | BufferSource | WebAssembly.Module): Promise<void>;
   export { GameEngine, GameState, CritterInfo };
 }
+
+declare global {
+  // Minimal shape to avoid importing types in a d.ts under strict rules
+  interface Window {
+    __A4D_WASM__?: {
+      default: (input?: RequestInfo | URL | Response | BufferSource | WebAssembly.Module) => Promise<void>
+      GameEngine: new () => {
+        start_game(): void
+        pause_game(): void
+        reset_game(): void
+        free?(): void
+      }
+    }
+  }
+}
+export {}

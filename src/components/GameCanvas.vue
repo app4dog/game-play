@@ -119,33 +119,62 @@ let lastInteractionPos = { x: 0, y: 0 }
 onMounted(async () => {
   try {
     // Load WASM module (will be built from Rust)
-    // Resolve public asset at runtime; prevent Vite from analyzing this import
+    // Prefer global preload via index.html; fallback to injecting a module script dynamically
     const moduleUrl = `${import.meta.env.BASE_URL}game-engine/app4dog_game_engine.js`
+    console.debug('[A4D][WASM] glue URL', moduleUrl)
 
-    // Guard: verify public/game-engine assets exist before importing
-    const assetExists = async (url: string): Promise<boolean> => {
+    // Guard: verify public/game-engine assets exist before initializing
+    const assetExists = async (url: string): Promise<{ ok: boolean; status?: number }> => {
       try {
         const res = await fetch(url, { method: 'HEAD' })
-        return res.ok
+        return { ok: res.ok, status: res.status }
       } catch {
-        return false
+        return { ok: false }
       }
     }
     const wasmUrl = moduleUrl.replace('app4dog_game_engine.js', 'app4dog_game_engine_bg.wasm')
-    const [jsOk, wasmOk] = await Promise.all([assetExists(moduleUrl), assetExists(wasmUrl)])
-    if (!jsOk || !wasmOk) {
-      const missing = [!jsOk ? 'JS' : null, !wasmOk ? 'WASM' : null].filter(Boolean).join(' & ')
+    const [jsHead, wasmHead] = await Promise.all([assetExists(moduleUrl), assetExists(wasmUrl)])
+    console.debug('[A4D][WASM] HEAD', { js: { url: moduleUrl, ...jsHead }, wasm: { url: wasmUrl, ...wasmHead } })
+    if (!jsHead.ok || !wasmHead.ok) {
+      const missing = [!jsHead.ok ? 'JS' : null, !wasmHead.ok ? 'WASM' : null].filter(Boolean).join(' & ')
       const friendly = `WASM assets missing (${missing}). Build with ./scripts/build-wasm.sh (or just build-wasm). Expected files in public/game-engine/.`
       console.error(friendly, { moduleUrl, wasmUrl })
       emit('gameError', friendly)
       return
     }
 
-    const mod = (await import(
-      /* @vite-ignore */ moduleUrl
-    )) as WasmModule
+    // Obtain the module exports
+    let mod = (window as Window & { __A4D_WASM__?: WasmModule }).__A4D_WASM__
+    if (!mod) {
+      // Dynamically inject a module script that imports and exposes the glue
+      console.debug('[A4D][WASM] injecting module script for glue')
+      const script = document.createElement('script')
+      script.type = 'module'
+      script.textContent = `import * as m from '${moduleUrl}'; window.__A4D_WASM__ = m;`
+      document.head.appendChild(script)
+      // Wait briefly for the module to load
+      mod = await new Promise<WasmModule | undefined>((resolve) => {
+        const start = performance.now()
+        const check = () => {
+          const m = (window as Window & { __A4D_WASM__?: WasmModule }).__A4D_WASM__
+          if (m) resolve(m)
+          else if (performance.now() - start > 3000) resolve(undefined)
+          else setTimeout(check, 50)
+        }
+        check()
+      })
+      if (!mod) {
+        const msg = 'WASM JS glue failed to load. Verify public/game-engine assets and host permissions.'
+        console.error(msg)
+        emit('gameError', msg)
+        return
+      }
+      console.debug('[A4D][WASM] glue module loaded via dynamic script')
+    }
     wasmModule = mod
+    console.debug('[A4D][WASM] initializing module default()')
     await wasmModule.default() // Initialize WASM
+    console.debug('[A4D][WASM] module initialized')
     
     gameEngine = new wasmModule.GameEngine()
     gameEngine.start_game()
