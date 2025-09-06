@@ -1,1 +1,14 @@
 // app global css in SCSS form
+
+@font-face {
+  font-family: 'HeroLegend';
+  src: url('/assets/fonts/herolegend.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+// Utility class to apply the game menu font
+.font-hero {
+  font-family: 'HeroLegend', system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+}

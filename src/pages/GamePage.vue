@@ -1,22 +1,7 @@
 <template>
   <q-page class="game-page">
-    <!-- Game loading state -->
-    <div v-if="gameLoading" class="game-loading">
-      <q-spinner-puff color="primary" size="4em" />
-      <p class="loading-text">🐕 Loading App4.Dog Game...</p>
-    </div>
-    
-    <!-- Game error state -->
-    <div v-else-if="gameError" class="game-error">
-      <q-icon name="error" color="negative" size="4em" />
-      <h3>Game Loading Error</h3>
-      <p>{{ gameError }}</p>
-      <q-btn color="primary" label="Retry" @click="initializeGame" />
-    </div>
-    
-    <!-- Game canvas -->
+    <!-- Game canvas is always mounted; we overlay loading/errors -->
     <GameCanvas
-      v-else
       ref="gameCanvas"
       @game-ready="onGameReady"
       @game-error="onGameError"
@@ -24,9 +9,31 @@
       class="full-height"
     />
     
+    <!-- Loading overlay -->
+    <q-inner-loading :showing="gameLoading">
+      <div class="game-loading">
+        <q-spinner-puff color="primary" size="4em" />
+        <p class="loading-text">🐕 Loading App4.Dog Game...</p>
+      </div>
+    </q-inner-loading>
+    
+    <!-- Error overlay -->
+    <q-dialog v-model="gameErrorDialog">
+      <q-card class="game-error">
+        <q-card-section class="text-center">
+          <q-icon name="error" color="negative" size="4em" />
+          <h3>Game Loading Error</h3>
+          <p>{{ gameError }}</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn color="primary" label="Retry" @click="retryInit" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+    
     <!-- Game menu overlay -->
     <q-dialog v-model="showMenu">
-      <q-card class="game-menu">
+      <q-card class="game-menu font-hero">
         <q-card-section class="text-center">
           <div class="text-h4">🐕 App4.Dog Game</div>
           <div class="text-subtitle2">Interactive Pet Training</div>
@@ -108,6 +115,7 @@ const $q = useQuasar()
 // Game state
 const gameLoading = ref(true)
 const gameError = ref<string | null>(null)
+const gameErrorDialog = ref(false)
 const showMenu = ref(true)
 const showCritterSelection = ref(false)
 const showSettings = ref(false)
@@ -141,6 +149,7 @@ const onGameReady = () => {
 const onGameError = (error: string) => {
   gameLoading.value = false
   gameError.value = error
+  gameErrorDialog.value = true
   
   $q.notify({
     type: 'negative',
@@ -176,6 +185,11 @@ const startGame = () => {
     position: 'top',
     timeout: 3000
   })
+}
+
+const retryInit = () => {
+  gameErrorDialog.value = false
+  initializeGame()
 }
 
 const startTrainingMode = () => {
@@ -257,6 +271,7 @@ onMounted(() => {
   padding: 0;
   height: 100vh;
   overflow: hidden;
+  background: url('/assets/logo/main-menu-splash-v1.png') center center / cover no-repeat fixed;
 }
 
 .game-loading,
