@@ -1,7 +1,2 @@
 name = "play"
 compatibility_date = "2024-09-06"
-
-# Build configuration for Pages
-[build]
-command = "pnpm install && pnpm install just && pnpm exec just build-wasm && pnpm run build"
-destination = "dist/spa"
