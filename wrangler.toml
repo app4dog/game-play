@@ -1,3 +1,6 @@
 name = "play-app4dog"
 compatibility_date = "2024-09-06"
-pages_build_output_dir = "dist/spa"
+
+# Static assets for Worker
+[assets]
+directory = "dist/spa"
