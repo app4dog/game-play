@@ -1,0 +1,20 @@
+{
+  "name": "app4dog-game-engine",
+  "type": "module",
+  "collaborators": [
+    "brianh@elastic.ventures"
+  ],
+  "description": "Rust/Bevy WASM game engine for App4.Dog interactive pet training",
+  "version": "0.1.0",
+  "license": "MIT",
+  "files": [
+    "app4dog_game_engine_bg.wasm",
+    "app4dog_game_engine.js",
+    "app4dog_game_engine.d.ts"
+  ],
+  "main": "app4dog_game_engine.js",
+  "types": "app4dog_game_engine.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

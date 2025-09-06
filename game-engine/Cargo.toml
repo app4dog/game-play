@@ -1,0 +1,66 @@
+[package]
+name = "app4dog-game-engine"
+version = "0.1.0"
+edition = "2021"
+resolver = "2"
+description = "Rust/Bevy WASM game engine for App4.Dog interactive pet training"
+authors = ["brianh@elastic.ventures"]
+license = "MIT"
+
+[lib]
+name = "app4dog_game_engine"
+crate-type = ["cdylib"]
+
+[dependencies]
+bevy = { version = "0.16", default-features = false, features = [
+    "bevy_winit",
+    "bevy_render",
+    "bevy_core_pipeline", 
+    "bevy_sprite",
+    "bevy_text",
+    "bevy_ui",
+    "bevy_asset",
+    "bevy_scene",
+    "bevy_animation",
+    "bevy_gltf",
+    "bevy_audio",
+    "png",
+    "vorbis",
+    "webgl2",
+] }
+wasm-bindgen = "0.2"
+web-sys = "0.3"
+js-sys = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rand = "0.8"
+# Force older ahash version that uses getrandom 0.2
+ahash = "0.7"
+
+# Explicit getrandom with wasm support
+[dependencies.getrandom]
+version = "0.2"
+features = ["js"]
+
+# Web-specific optimizations
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = { version = "0.1", optional = true }
+wee_alloc = "0.4"
+
+[features]
+console_error_panic_hook = ["dep:console_error_panic_hook"]
+
+# Development dependencies for testing
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+
+# Profile for WASM builds - optimize for size
+[profile.release]
+opt-level = "s"
+lto = true
+panic = "abort"
+
+# Profile for development builds
+[profile.dev]
+opt-level = 1
