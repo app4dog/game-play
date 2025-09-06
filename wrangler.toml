@@ -7,7 +7,4 @@ destination = "dist/spa"
 
 [build.environment_variables]
 NODE_VERSION = "20"
-
-[[build.environment_variables]]
-name = "PNPM_VERSION"
-value = "8"
+PNPM_VERSION = "8"
