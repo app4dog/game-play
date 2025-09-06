@@ -5,18 +5,25 @@ set -e
 
 echo "🦀 Building App4.Dog Game Engine (Rust -> WASM)"
 
-# Check if required tools are installed
-if ! command -v wasm-pack &> /dev/null; then
+# Load Rust environment
+. ~/.cargo/env 2>/dev/null || true
+
+# Check if required tools are installed (check both PATH and cargo bin)
+if ! command -v wasm-pack &> /dev/null && ! [ -f ~/.cargo/bin/wasm-pack ]; then
     echo "❌ wasm-pack not found. Installing..."
-    curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    ~/.cargo/bin/cargo install wasm-pack || curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 fi
 
 # Navigate to game engine directory
 cd game-engine
 
-# Build for web target
+# Build for web target using absolute path if needed
 echo "🏗️ Building WASM module..."
-wasm-pack build --target web --out-dir pkg --dev
+if command -v wasm-pack &> /dev/null; then
+    wasm-pack build --target web --out-dir pkg --dev
+else
+    ~/.cargo/bin/wasm-pack build --target web --out-dir pkg --dev
+fi
 
 # Copy generated files to public directory for Quasar
 echo "📦 Copying WASM files to public directory..."
