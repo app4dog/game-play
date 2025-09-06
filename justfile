@@ -130,16 +130,17 @@ deploy:
     @if ! command -v rustc &> /dev/null; then \
         echo "🦀 Installing Rust toolchain..."; \
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; \
-        source ~/.cargo/env; \
-        rustup target add wasm32-unknown-unknown; \
+        . ~/.cargo/env; \
+        ~/.cargo/bin/rustup target add wasm32-unknown-unknown; \
     else \
         echo "✅ Rust already installed"; \
-        source ~/.cargo/env 2>/dev/null || true; \
+        . ~/.cargo/env 2>/dev/null || true; \
     fi
     @# Check and install wasm-pack if needed
-    @if ! command -v wasm-pack &> /dev/null; then \
+    @if ! command -v wasm-pack &> /dev/null && ! [ -f ~/.cargo/bin/wasm-pack ]; then \
         echo "📦 Installing wasm-pack..."; \
-        curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh; \
+        . ~/.cargo/env 2>/dev/null || true; \
+        ~/.cargo/bin/cargo install wasm-pack || curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh; \
     else \
         echo "✅ wasm-pack already installed"; \
     fi
