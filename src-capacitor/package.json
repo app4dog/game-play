@@ -1,0 +1,12 @@
+{
+  "name": "dog.app4.game",
+  "version": "0.0.1",
+  "description": "App4.Dog gamifies learning for puppies!",
+  "author": "elasticdotventures <brianh@elastic.ventures>",
+  "private": true,
+  "dependencies": {
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  }
+}
