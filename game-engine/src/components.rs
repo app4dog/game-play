@@ -11,7 +11,7 @@ pub struct Critter {
     pub happiness: f32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum CritterSpecies {
     Bird,
     Bunny,

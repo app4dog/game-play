@@ -12,22 +12,24 @@ name = "app4dog_game_engine"
 crate-type = ["cdylib"]
 
 [dependencies]
+# Full Bevy features for complex pet training game
 bevy = { version = "0.16", default-features = false, features = [
-    "bevy_winit",
-    "bevy_render",
-    "bevy_core_pipeline", 
-    "bevy_sprite",
-    "bevy_text",
-    "bevy_ui",
-    "bevy_asset",
-    "bevy_scene",
-    "bevy_animation",
-    "bevy_gltf",
-    "bevy_audio",
-    "png",
-    "vorbis",
-    "webgl2",
+    "bevy_winit",        # Window management
+    "bevy_render",       # Rendering system
+    "bevy_core_pipeline", # Rendering pipeline
+    "bevy_sprite",       # 2D sprites
+    "bevy_text",         # Text rendering
+    "bevy_ui",           # UI system
+    "bevy_asset",        # Asset loading
+    "bevy_scene",        # Scene management
+    "bevy_animation",    # Animation system
+    "bevy_gltf",         # GLTF model support
+    "bevy_audio",        # Audio system
+    "png",               # PNG image support
+    "vorbis",            # Audio codec
+    "webgl2",            # WebGL backend
 ] }
+bevy_web_asset = "0.11.0"  # HTTP asset loading for WASM
 wasm-bindgen = "0.2"
 web-sys = "0.3"
 js-sys = "0.3"
@@ -36,7 +38,6 @@ serde_json = "1.0"
 rand = "0.8"
 # Force older ahash version that uses getrandom 0.2
 ahash = "0.7"
-
 # Explicit getrandom with wasm support
 [dependencies.getrandom]
 version = "0.2"
@@ -55,11 +56,17 @@ console_error_panic_hook = ["dep:console_error_panic_hook"]
 wasm-bindgen-test = "0.3"
 
 
-# Profile for WASM builds - optimize for size
+# Profile for WASM builds - optimize for size (Bevy cheatbook recommendations)
 [profile.release]
-opt-level = "s"
-lto = true
-panic = "abort"
+opt-level = "z"      # Optimize for size over speed
+lto = true           # Link-time optimization
+codegen-units = 1    # Most aggressive optimization
+panic = "abort"      # Don't include unwinding code
+strip = true         # Strip debug symbols
+
+# Disable automatic wasm-opt (we'll run it manually with correct flags)
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
 
 # Profile for development builds
 [profile.dev]

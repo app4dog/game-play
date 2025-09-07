@@ -203,16 +203,26 @@ const startTrainingMode = () => {
   })
 }
 
-const onCritterSelected = (critterName: string) => {
+const onCritterSelected = (critter: { id: string; name: string; species: string }) => {
   showCritterSelection.value = false
   
   $q.notify({
     type: 'positive',
-    message: `${critterName} selected! 🎉`,
+    message: `${critter.name} selected! 🎉`,
     position: 'top'
   })
   
-  // Future: tell game engine to spawn selected critter
+  // Communicate selected critter to WASM game engine
+  const gameCanvasComponent = gameCanvas.value
+  if (gameCanvasComponent && gameCanvasComponent.loadCritter) {
+    // Map critter ID from string to number (simple hash or use index)
+    const critterId = critter.id === 'chirpy' ? 1 : critter.id === 'bouncy' ? 2 : 0
+    
+    console.log(`🐶 Loading critter in game engine: ${critter.name}`)
+    gameCanvasComponent.loadCritter(critterId, critter.name, critter.species)
+  } else {
+    console.warn('⚠️ Game engine not ready for critter loading')
+  }
 }
 
 const onSettingsChanged = (settings: unknown) => {

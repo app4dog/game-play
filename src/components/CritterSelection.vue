@@ -121,7 +121,7 @@ const $q = useQuasar()
 
 // Emit events
 const emit = defineEmits<{
-  critterSelected: [critterName: string]
+  critterSelected: [critter: Critter]
   close: []
 }>()
 
@@ -209,7 +209,7 @@ const selectCritter = (critter: Critter) => {
 const confirmSelection = () => {
   if (!selectedCritterData.value) return
   
-  emit('critterSelected', selectedCritterData.value.name)
+  emit('critterSelected', selectedCritterData.value)
 }
 
 // No image error handler needed; SpritePreview handles fallbacks

@@ -99,8 +99,8 @@ pub struct GameConfig {
 impl Default for GameConfig {
     fn default() -> Self {
         Self {
-            screen_bounds: Vec2::new(800.0, 600.0),
-            pet_spawn_bounds: Vec2::new(400.0, 300.0),
+            screen_bounds: Vec2::new(1200.0, 800.0), // Larger screen bounds
+            pet_spawn_bounds: Vec2::new(500.0, 350.0), // Larger spawn area
             interaction_sensitivity: 1.0,
             audio_enabled: true,
             vibration_enabled: true,

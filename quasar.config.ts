@@ -102,7 +102,7 @@ export default defineConfig((ctx) => {
 
     // Full list of options: https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#devserver
     devServer: {
-      // https: true,
+      https: true, // Enable HTTPS for WASM asset loading compatibility
       open: false, // don't open browser window automatically
       host: '0.0.0.0',
       // Restrict dev server to approved hostnames only
