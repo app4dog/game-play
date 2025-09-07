@@ -42,6 +42,10 @@ interface GameEngineApi {
   start_game(): void
   pause_game(): void
   reset_game(): void
+  handle_interaction?(type: string, x: number, y: number, dir_x: number, dir_y: number): void
+  load_critter?(critter_id: number, name: string, species: string): void
+  get_critter_info?(): { id: number; name: string; species: string; happiness: number; energy: number }
+  unload_critter?(): void
   free?(): void
 }
 
@@ -57,6 +61,11 @@ const emit = defineEmits<{
   gameError: [error: string]
   scoreChanged: [score: number]
 }>()
+
+// Expose game engine for other components
+const getGameEngine = () => gameEngine
+
+// Export for parent component access (consolidated)
 
 // Reactive state
 const gameCanvas: Ref<HTMLCanvasElement | null> = ref(null)
@@ -287,17 +296,29 @@ const sendInteractionToGame = (
   position: { x: number; y: number },
   direction?: { x: number; y: number }
 ) => {
-  if (!gameEngine) return
+  if (!gameEngine) {
+    console.warn('🐾 Pet interaction ignored: Game engine not initialized')
+    return
+  }
   
-  // This will call into the WASM module
   console.log(`🐾 Pet interaction: ${type} at (${position.x}, ${position.y})`)
-  // Touch direction currently unused by engine (keep to satisfy ESLint/TS)
-  const dx = direction?.x ?? 0
-  const dy = direction?.y ?? 0
-  void dx; void dy
   
-  // Future: call actual WASM function
-  // gameEngine.handle_interaction(type, position.x, position.y, direction?.x || 0, direction?.y || 0)
+  // Call the WASM game engine
+  try {
+    const dx = direction?.x ?? 0
+    const dy = direction?.y ?? 0
+    
+    // Check if the method exists on the game engine
+    if (gameEngine.handle_interaction) {
+      gameEngine.handle_interaction(type, position.x, position.y, dx, dy)
+      console.log(`✅ Interaction sent to WASM: ${type}`)
+    } else {
+      console.warn('⚠️ handle_interaction method not found on game engine')
+      console.log('Available methods:', Object.getOwnPropertyNames(gameEngine))
+    }
+  } catch (error) {
+    console.error('❌ Failed to send interaction to game engine:', error)
+  }
 }
 
 // Game controls
@@ -311,11 +332,23 @@ const pauseGame = () => {
   gameEngine?.pause_game?.()
 }
 
-// Expose methods to parent components
+// Expose methods to parent components (consolidated)
 defineExpose({
+  // Game control methods
   pauseGame,
   resumeGame,
-  resetGame: () => gameEngine?.reset_game?.()
+  resetGame: () => gameEngine?.reset_game?.(),
+  
+  // Game engine access methods
+  getGameEngine,
+  loadCritter: (critterId: number, name: string, species: string) => {
+    if (gameEngine?.load_critter) {
+      gameEngine.load_critter(critterId, name, species)
+    }
+  },
+  getCritterInfo: () => {
+    return gameEngine?.get_critter_info?.() || null
+  }
 })
 
 // ---- Sprite loading & fallback rendering ----

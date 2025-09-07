@@ -7,6 +7,10 @@ export class GameEngine {
   start_game(): void;
   pause_game(): void;
   reset_game(): void;
+  handle_interaction(interaction_type: string, x: number, y: number, dir_x: number, dir_y: number): void;
+  load_critter(critter_id: number, name: string, species: string): void;
+  get_critter_info(): object;
+  unload_critter(): void;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -19,24 +23,18 @@ export interface InitOutput {
   readonly gameengine_start_game: (a: number) => void;
   readonly gameengine_pause_game: (a: number) => void;
   readonly gameengine_reset_game: (a: number) => void;
-  readonly __externref_table_alloc: () => number;
-  readonly __wbindgen_export_1: WebAssembly.Table;
-  readonly __wbindgen_exn_store: (a: number) => void;
-  readonly __wbindgen_malloc: (a: number, b: number) => number;
-  readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
-  readonly __wbindgen_free: (a: number, b: number, c: number) => void;
-  readonly __wbindgen_export_6: WebAssembly.Table;
-  readonly wasm_bindgen__convert__closures_____invoke__h3edbcab2bf0b24e6: (a: number, b: number) => void;
-  readonly closure1447_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure1459_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure1453_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure1455_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure1457_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure1445_externref_shim: (a: number, b: number, c: any, d: any) => void;
-  readonly closure1449_externref_shim: (a: number, b: number, c: any) => void;
-  readonly closure1443_externref_shim: (a: number, b: number, c: any) => void;
-  readonly wasm_bindgen__convert__closures_____invoke__hf7e0da03f29b1a68: (a: number, b: number) => void;
-  readonly closure136486_externref_shim: (a: number, b: number, c: any) => void;
+  readonly gameengine_handle_interaction: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+  readonly gameengine_load_critter: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly gameengine_get_critter_info: (a: number) => number;
+  readonly gameengine_unload_critter: (a: number) => void;
+  readonly __wbindgen_export_0: (a: number) => void;
+  readonly __wbindgen_export_1: (a: number, b: number) => number;
+  readonly __wbindgen_export_2: (a: number, b: number, c: number, d: number) => number;
+  readonly __wbindgen_export_3: (a: number, b: number, c: number) => void;
+  readonly __wbindgen_export_4: WebAssembly.Table;
+  readonly __wbindgen_export_5: (a: number, b: number, c: number) => void;
+  readonly __wbindgen_export_6: (a: number, b: number) => void;
+  readonly __wbindgen_export_7: (a: number, b: number, c: number, d: number) => void;
   readonly __wbindgen_start: () => void;
 }
 

@@ -12,6 +12,7 @@ impl Plugin for GamePlugin {
             .init_resource::<GameState>()
             .init_resource::<CritterRegistry>()
             .init_resource::<AssetCollection>()
+            .init_resource::<GameConfig>()
             
             // Startup systems
             .add_systems(Startup, (
@@ -22,15 +23,22 @@ impl Plugin for GamePlugin {
             
             // Update systems
             .add_systems(Update, (
+                critter_loading_system,
+                critter_spawning_system,
+                auto_spawn_system,
                 critter_movement_system,
                 critter_interaction_system,
                 game_state_system,
                 ui_update_system,
+                window_resize_system,
+                monitor_asset_loading,
             ))
             
             // Events
             .add_event::<CritterInteractionEvent>()
-            .add_event::<GameProgressEvent>();
+            .add_event::<GameProgressEvent>()
+            .add_event::<SpawnCritterEvent>()
+            .add_event::<LoadCritterEvent>();
     }
 }
 
@@ -41,6 +49,7 @@ pub struct GameState {
     pub current_critter_id: Option<Entity>,
     pub is_paused: bool,
     pub game_mode: GameMode,
+    pub selected_critter_template: Option<usize>, // Index into CritterRegistry
 }
 
 #[derive(Default, Debug, PartialEq)]
@@ -70,4 +79,16 @@ pub enum InteractionType {
     Tap,
     Swipe(Vec2), // direction
     Hold,
+}
+
+#[derive(Event)]
+pub struct SpawnCritterEvent {
+    pub position: Vec2,
+}
+
+#[derive(Event)]
+pub struct LoadCritterEvent {
+    pub critter_id: u32,
+    pub name: String,
+    pub species: String,
 }

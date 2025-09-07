@@ -20,9 +20,17 @@ cd game-engine
 # Build for web target using absolute path if needed
 echo "🏗️ Building WASM module..."
 if command -v wasm-pack &> /dev/null; then
-    wasm-pack build --target web --out-dir pkg --dev
+    wasm-pack build --target web --out-dir pkg --release
 else
-    ~/.cargo/bin/wasm-pack build --target web --out-dir pkg --dev
+    ~/.cargo/bin/wasm-pack build --target web --out-dir pkg --release
+fi
+
+# Post-process with wasm-opt for additional size reduction
+if command -v wasm-opt &> /dev/null; then
+    echo "🗜️ Optimizing WASM with wasm-opt..."
+    wasm-opt -Oz pkg/app4dog_game_engine_bg.wasm -o pkg/app4dog_game_engine_bg.wasm
+else
+    echo "⚠️ wasm-opt not found - install with: npm install -g binaryen"
 fi
 
 # Copy generated files to public directory for Quasar
