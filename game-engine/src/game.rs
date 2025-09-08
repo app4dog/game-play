@@ -28,6 +28,7 @@ impl Plugin for GamePlugin {
                 auto_spawn_system,
                 critter_movement_system,
                 critter_interaction_system,
+                sprite_animation_system,
                 game_state_system,
                 ui_update_system,
                 window_resize_system,
@@ -49,7 +50,7 @@ pub struct GameState {
     pub current_critter_id: Option<Entity>,
     pub is_paused: bool,
     pub game_mode: GameMode,
-    pub selected_critter_template: Option<usize>, // Index into CritterRegistry
+    pub selected_critter_id: Option<String>, // Critter ID from CritterRegistry
 }
 
 #[derive(Default, Debug, PartialEq)]

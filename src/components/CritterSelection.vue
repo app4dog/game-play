@@ -6,7 +6,15 @@
     </q-card-section>
     
     <q-card-section>
-      <div class="critter-grid">
+      <!-- Loading state -->
+      <div v-if="isLoading" class="text-center q-py-lg">
+        <q-spinner color="primary" size="3em" />
+        <div class="text-h6 q-mt-md">Loading critters...</div>
+        <div class="text-caption">Initializing WASM critter-keeper</div>
+      </div>
+      
+      <!-- Critter grid -->
+      <div v-else class="critter-grid">
         <div
           v-for="critter in availableCritters"
           :key="critter.id"
@@ -82,7 +90,7 @@
       <q-btn 
         color="primary" 
         label="Select"
-        :disabled="!selectedCritter || !selectedCritterData?.unlocked"
+        :disabled="isLoading || !selectedCritter || !selectedCritterData?.unlocked"
         @click="confirmSelection"
       />
     </q-card-actions>
@@ -90,9 +98,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import SpritePreview from './SpritePreview.vue'
+import init, { CritterKeeperWasm } from 'critter-keeper'
 
 interface CritterStats {
   speed: number
@@ -117,6 +126,13 @@ interface Critter {
   frames: Array<{ x: number; y: number }>
 }
 
+interface FrameLayout {
+  frame_size: [number, number]
+  layout: 'Horizontal' | 'Vertical' | { Grid: { cols: number; rows: number } }
+  frame_count: number
+  image_size: [number, number]
+}
+
 const $q = useQuasar()
 
 // Emit events
@@ -128,56 +144,131 @@ const emit = defineEmits<{
 // Selected critter state
 const selectedCritter = ref<string | null>(null)
 
-// Mock critter data (in real app, this would come from Rust WASM module)
-const availableCritters = ref<Critter[]>([
-  {
-    id: 'chirpy',
-    name: 'Chirpy',
-    species: 'Bird',
-    imagePath: '/assets/sprites/bird-animation.png',
-    unlocked: true,
-    unlockLevel: 1,
-    stats: {
-      speed: 150,
-      playfulness: 0.8,
-      obedience: 0.6,
-      energy: 100
-    },
-    description: 'A cheerful bird who loves to fly around and play catch!',
-    // Bird sheet: 3000x2000 with 6 frames at 1000x1000 (3x2)
-    frameWidth: 1000,
-    frameHeight: 1000,
-    frameCount: 6,
-    frameRate: 10,
-    frames: [
-      { x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 2000, y: 0 },
-      { x: 0, y: 1000 }, { x: 1000, y: 1000 }, { x: 2000, y: 1000 }
-    ]
-  },
-  {
-    id: 'bouncy',
-    name: 'Bouncy',
-    species: 'Bunny',
-    imagePath: '/assets/sprites/bunny-sprite-sheet.png',
-    unlocked: true, // Will be level-gated in real game
-    unlockLevel: 2,
-    stats: {
-      speed: 120,
-      playfulness: 0.9,
-      obedience: 0.7,
-      energy: 120
-    },
-    description: 'An energetic bunny who hops around and loves to be chased!',
-    // Bunny sheet: 512x512; frames at (0,0) and (256,384) of 128x128
-    frameWidth: 128,
-    frameHeight: 128,
-    frameCount: 2,
-    frameRate: 2,
-    frames: [
-      { x: 0, y: 0 }, { x: 256, y: 384 }
-    ]
+// WASM critter keeper instance
+const critterKeeper = ref<CritterKeeperWasm | null>(null)
+const availableCritters = ref<Critter[]>([])
+const isLoading = ref(true)
+
+// Initialize WASM critter-keeper
+onMounted(async () => {
+  try {
+    // Initialize WASM module with explicit URL
+    await init('/wasm/critter_keeper_bg.wasm')
+    
+    // Load catalog RON
+    const catalogResponse = await fetch('/critters/catalog.ron')
+    const catalogRon = await catalogResponse.text()
+    
+    // Create critter keeper instance with local base URL
+    critterKeeper.value = new CritterKeeperWasm(
+      '', // Use relative URLs for same-origin requests
+      catalogRon
+    )
+    
+    // Load critter data from WASM module
+    const critterIds = critterKeeper.value.list_critters()
+    const critters: Critter[] = []
+    
+    for (const critterId of critterIds) {
+      const metadata = JSON.parse(critterKeeper.value.get_critter_metadata(critterId) || '{}')
+      const stats = JSON.parse(critterKeeper.value.get_stats(critterId) || '{}')
+      const frameLayout = JSON.parse(critterKeeper.value.get_frame_layout(critterId) || '{}')
+      const spriteUrl = critterKeeper.value.get_sprite_url(critterId) || ''
+      const idleAnimation = JSON.parse(critterKeeper.value.get_animation(critterId, 'idle') || '{}')
+      
+      // Generate correct frame positions using animation frame indices
+      const frames = generateFramePositions(frameLayout, idleAnimation.frames || [])
+      console.log(`🐛 Debug ${critterId} frames:`, frames)
+      console.log(`🐛 Debug ${critterId} frameLayout:`, frameLayout)
+      console.log(`🐛 Debug ${critterId} idleAnimation:`, idleAnimation)
+      
+      // Log what coordinates we're generating
+      console.log(`🎯 ${critterId} generated coordinates:`, frames.map(f => `(${f.x},${f.y})`).join(', '))
+      
+      // Map WASM data to expected Critter interface (maintaining compatibility)
+      const critter: Critter = {
+        id: critterId,
+        name: metadata.name,
+        species: metadata.species,
+        imagePath: spriteUrl,
+        unlocked: true, // TODO: Implement level gating
+        unlockLevel: 1,
+        stats: {
+          speed: stats.base_speed,
+          playfulness: stats.happiness_boost,
+          obedience: 0.7, // Default value for compatibility
+          energy: stats.energy
+        },
+        description: `A ${metadata.species.toLowerCase()} critter`,
+        frameWidth: frameLayout.frame_size[0],
+        frameHeight: frameLayout.frame_size[1], 
+        frameCount: frameLayout.frame_count,
+        frameRate: idleAnimation.fps || 2,
+        frames: frames
+      }
+      
+      critters.push(critter)
+    }
+    
+    availableCritters.value = critters
+    isLoading.value = false
+    
+  } catch (error) {
+    console.error('Failed to initialize critter-keeper WASM:', error)
+    $q.notify({
+      type: 'negative',
+      message: 'Failed to load critter data',
+      position: 'top'
+    })
+    isLoading.value = false
   }
-])
+})
+
+// Generate frame positions based on layout configuration and animation frame indices
+function generateFramePositions(frameLayout: FrameLayout, animationFrames: number[]): Array<{ x: number; y: number }> {
+  const { frame_size, layout } = frameLayout
+  const [frameWidth, frameHeight] = frame_size
+  
+  if (typeof layout === 'object' && layout.Grid) {
+    const { cols, rows } = layout.Grid
+    
+    // Generate all possible frame positions in the grid
+    const allFrames: Array<{ x: number; y: number }> = []
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        allFrames.push({
+          x: col * frameWidth,
+          y: row * frameHeight
+        })
+      }
+    }
+    
+    // Return positions for the specific animation frames
+    // E.g. for bunny with frames [0, 14], return coordinates for grid positions 0 and 14
+    return animationFrames.map((frameIndex): { x: number; y: number } => {
+      if (frameIndex < allFrames.length && frameIndex >= 0) {
+        const frame = allFrames[frameIndex]
+        return frame || { x: 0, y: 0 }
+      } else {
+        // Fallback for invalid frame indices
+        return { x: 0, y: 0 }
+      }
+    })
+    
+  } else if (layout === 'Horizontal') {
+    return animationFrames.map(frameIndex => ({
+      x: frameIndex * frameWidth,
+      y: 0
+    }))
+  } else if (layout === 'Vertical') {
+    return animationFrames.map(frameIndex => ({
+      x: 0,
+      y: frameIndex * frameHeight
+    }))
+  }
+  
+  return []
+}
 
 // Computed selected critter data
 const selectedCritterData = computed(() => {

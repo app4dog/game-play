@@ -228,9 +228,11 @@ dependencies = [
  "bevy",
  "bevy_web_asset",
  "console_error_panic_hook",
+ "critter-keeper",
  "getrandom 0.2.16",
  "js-sys",
  "rand 0.8.5",
+ "ron",
  "serde",
  "serde_json",
  "wasm-bindgen",
@@ -2004,6 +2006,15 @@ name = "critical-section"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
+
+[[package]]
+name = "critter-keeper"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "ron",
+ "serde",
+]
 
 [[package]]
 name = "crossbeam-channel"

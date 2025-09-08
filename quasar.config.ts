@@ -65,6 +65,21 @@ export default defineConfig((ctx) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const serverConf = ((viteConf as any).server ||= {});
         serverConf.allowedHosts = ['play.app4.dog'];
+
+        // Configure MIME types for WASM files
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        serverConf.middlewareMode = false;
+        serverConf.fs = { allow: ['..'] };
+        
+        // Add CORS headers for cross-origin requests
+        serverConf.cors = {
+          origin: ['https://play.app4.dog:9000', 'https://play.app4.dog:9001'],
+          credentials: true
+        };
+
+        // Configure static file serving with proper MIME types
+        if (!viteConf.define) viteConf.define = {};
+        viteConf.define.__WASM_MIME_TYPE__ = '"application/wasm"';
       },
       // viteVuePluginOptions: {},
 
@@ -113,6 +128,19 @@ export default defineConfig((ctx) => {
       server: {
         allowedHosts: ['play.app4.dog', 'localhost'],
       },
+      // CORS configuration for cross-origin requests
+      cors: {
+        origin: ['https://play.app4.dog:9000', 'https://play.app4.dog:9001'],
+        credentials: true,
+      },
+      // Headers for proper MIME type handling
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Cross-Origin-Embedder-Policy': 'credentialless',
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      }
     },
 
     // https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#framework
