@@ -48,20 +48,20 @@ pub fn load_game_assets(
     asset_server: Res<AssetServer>,
     mut asset_collection: ResMut<AssetCollection>,
 ) {
-    // Load sprite sheets using relative URLs that work in browser context
-    console_log!("🎨 Starting asset loading with relative URLs...");
+    // Load sprite sheets using HTTPS URLs with WebAssetPlugin
+    console_log!("🎨 Starting asset loading with HTTPS URLs...");
     
-    // Use relative paths - the browser will resolve these correctly
-    asset_collection.bird_sprite = asset_server.load("assets/sprites/bird-animation.png");
+    // Use HTTPS URLs with WebAssetPlugin configured properly
+    asset_collection.bird_sprite = asset_server.load("https://play.app4.dog:9000/assets/sprites/bird-animation.png");
     console_log!("🐦 Bird sprite handle created: {:?}", asset_collection.bird_sprite);
     
-    asset_collection.bunny_sprite = asset_server.load("assets/sprites/bunny-sprite-sheet.png");  
+    asset_collection.bunny_sprite = asset_server.load("https://play.app4.dog:9000/assets/sprites/bunny-sprite-sheet.png");  
     console_log!("🐰 Bunny sprite handle created: {:?}", asset_collection.bunny_sprite);
     
     // Load audio
-    asset_collection.positive_sound = asset_server.load("assets/audio/positive/yipee.ogg");
+    asset_collection.positive_sound = asset_server.load("https://play.app4.dog:9000/assets/audio/positive/yipee.ogg");
     
-    console_log!("✅ Asset loading initiated with relative URLs");
+    console_log!("✅ Asset loading initiated with HTTPS URLs");
 }
 
 /// Enhanced asset loading status monitoring system with detailed error handling
@@ -69,8 +69,14 @@ pub fn monitor_asset_loading(
     asset_server: Res<AssetServer>,
     asset_collection: Res<AssetCollection>,
     mut monitoring_timer: Local<Timer>,
+    mut assets_loaded: Local<bool>,
     time: Res<Time>,
 ) {
+    // Only monitor if assets aren't loaded yet
+    if *assets_loaded {
+        return;
+    }
+    
     if monitoring_timer.duration().is_zero() {
         *monitoring_timer = Timer::from_seconds(2.0, TimerMode::Repeating);
     }
@@ -81,23 +87,30 @@ pub fn monitor_asset_loading(
         let bird_status = asset_server.get_load_state(&asset_collection.bird_sprite);
         let bunny_status = asset_server.get_load_state(&asset_collection.bunny_sprite);
         
-        console_log!("📊 Asset Loading Status Check:");
-        console_log!("🔍 Bird Status: {:?}, Bunny Status: {:?}", bird_status, bunny_status);
+        let bird_loaded = matches!(bird_status, Some(bevy::asset::LoadState::Loaded));
+        let bunny_loaded = matches!(bunny_status, Some(bevy::asset::LoadState::Loaded));
+        
+        // Only log if not both loaded
+        if !(bird_loaded && bunny_loaded) {
+            console_log!("📊 Asset Loading Status Check:");
+            console_log!("🔍 Bird Status: {:?}, Bunny Status: {:?}", bird_status, bunny_status);
+        }
         
         // Enhanced bird sprite status checking
         if let Some(bird_state) = bird_status {
             match bird_state {
                 bevy::asset::LoadState::NotLoaded => console_log!("🐦 Bird sprite: ⏳ Not loaded yet"),
                 bevy::asset::LoadState::Loading => console_log!("🐦 Bird sprite: 🔄 Loading in progress..."),
-                bevy::asset::LoadState::Loaded => console_log!("🐦 Bird sprite: ✅ Loaded successfully"),
+                bevy::asset::LoadState::Loaded => {
+                    if !*assets_loaded {
+                        console_log!("🐦 Bird sprite: ✅ Loaded successfully");
+                    }
+                },
                 bevy::asset::LoadState::Failed(err) => {
                     console_log!("🐦 Bird sprite: ❌ Failed to load - Error: {:?}", err);
                     console_log!("🔧 Trying to diagnose asset loading issue...");
-                    // Add recovery logic here if needed
                 }
             }
-        } else {
-            console_log!("🐦 Bird sprite: ❓ Status unknown");
         }
         
         // Enhanced bunny sprite status checking  
@@ -105,9 +118,19 @@ pub fn monitor_asset_loading(
             match bunny_state {
                 bevy::asset::LoadState::NotLoaded => console_log!("🐰 Bunny sprite: Not loaded"),
                 bevy::asset::LoadState::Loading => console_log!("🐰 Bunny sprite: Loading..."),
-                bevy::asset::LoadState::Loaded => console_log!("🐰 Bunny sprite: ✅ Loaded successfully"),
+                bevy::asset::LoadState::Loaded => {
+                    if !*assets_loaded {
+                        console_log!("🐰 Bunny sprite: ✅ Loaded successfully");
+                    }
+                },
                 bevy::asset::LoadState::Failed(_) => console_log!("🐰 Bunny sprite: ❌ Failed to load"),
             }
+        }
+        
+        // Mark as loaded when both assets are loaded
+        if bird_loaded && bunny_loaded {
+            *assets_loaded = true;
+            console_log!("🎉 All sprites loaded successfully! Monitoring stopped.");
         }
     }
 }
@@ -286,13 +309,14 @@ pub fn critter_loading_system(
     critter_registry: Res<CritterRegistry>,
 ) {
     for event in load_events.read() {
-        // Find critter template by name
-        let template_idx = critter_registry.available_critters.iter()
-            .position(|template| template.name.to_lowercase() == event.name.to_lowercase());
+        // Find critter by name in catalog
+        let critter_id = critter_registry.catalog.critters.iter()
+            .find(|(_, critter)| critter.name.to_lowercase() == event.name.to_lowercase())
+            .map(|(id, _)| id.clone());
         
-        if let Some(idx) = template_idx {
-            game_state.selected_critter_template = Some(idx);
-            console_log!("🐶 Critter {} selected for spawning", event.name);
+        if let Some(id) = critter_id {
+            game_state.selected_critter_id = Some(id.clone());
+            console_log!("🐶 Critter {} (ID: {}) selected for spawning", event.name, id);
         } else {
             console_log!("⚠️ Unknown critter: {}", event.name);
         }
@@ -309,13 +333,13 @@ pub fn critter_spawning_system(
     asset_server: Res<AssetServer>,
 ) {
     for event in spawn_events.read() {
-        // Only spawn if we have a selected critter template and no current critter
-        if let (Some(template_idx), None) = (game_state.selected_critter_template, game_state.current_critter_id) {
-            if let Some(template) = critter_registry.available_critters.get(template_idx) {
+        // Only spawn if we have a selected critter ID and no current critter
+        if let (Some(ref critter_id), None) = (&game_state.selected_critter_id, game_state.current_critter_id) {
+            if let Some(critter_data) = critter_registry.catalog.critters.get(critter_id) {
                 
                 // Check if sprite is loaded, use fallback if not
-                let (sprite_handle, use_fallback) = match template.species {
-                    CritterSpecies::Bird => {
+                let (sprite_handle, use_fallback) = match critter_data.species {
+                    critter_keeper::CritterSpecies::Bird => {
                         let handle = asset_collection.bird_sprite.clone();
                         let status = asset_server.get_load_state(&handle);
                         console_log!("🐦 Using bird sprite handle, status: {:?}", status);
@@ -329,7 +353,7 @@ pub fn critter_spawning_system(
                             _ => (handle, false), // Still loading or not started
                         }
                     },
-                    CritterSpecies::Bunny => {
+                    critter_keeper::CritterSpecies::Bunny => {
                         let handle = asset_collection.bunny_sprite.clone();
                         let status = asset_server.get_load_state(&handle);
                         console_log!("🐰 Using bunny sprite handle, status: {:?}", status);
@@ -342,27 +366,10 @@ pub fn critter_spawning_system(
                             },
                             _ => (handle, false), // Still loading or not started
                         }
-                    },
-                    _ => {
-                        console_log!("❓ Using fallback sprite");
-                        (asset_server.load("assets/sprites/default.png"), true)
-                    },
+                    }
                 };
                 
                 console_log!("🖼️ Spawning sprite at position ({}, {}) with scale 0.5", event.position.x, event.position.y);
-                
-                // DEBUG: Create a red rectangle as fallback to test rendering
-                commands.spawn((
-                    Sprite {
-                        image: Default::default(),
-                        color: Color::srgb(1.0, 0.0, 0.0), // Bright red for debugging
-                        custom_size: Some(Vec2::new(100.0, 100.0)), // 100x100 red square
-                        ..default()
-                    },
-                    Transform::from_translation((event.position + Vec2::new(150.0, 0.0)).extend(200.0))
-                        .with_scale(Vec3::splat(1.0)),
-                ));
-                console_log!("🟥 DEBUG: Spawned red square at ({}, {}) for visibility test", event.position.x + 150.0, event.position.y);
                 
                 // Spawn critter entity with maximum visibility  
                 let critter_entity = commands.spawn((
@@ -379,14 +386,17 @@ pub fn critter_spawning_system(
                     Transform::from_translation(event.position.extend(100.0)) // Much higher Z for visibility
                         .with_scale(Vec3::splat(1.0)), // Full scale for maximum visibility
                     Critter {
-                        name: template.name.clone(),
-                        species: template.species.clone(),
-                        personality: CritterPersonality {
-                            playfulness: template.base_stats.playfulness,
-                            curiosity: 0.7,
-                            obedience: template.base_stats.obedience,
+                        name: critter_data.name.clone(),
+                        species: match critter_data.species {
+                            critter_keeper::CritterSpecies::Bird => CritterSpecies::Bird,
+                            critter_keeper::CritterSpecies::Bunny => CritterSpecies::Bunny,
                         },
-                        energy: template.base_stats.energy,
+                        personality: CritterPersonality {
+                            playfulness: critter_data.stats.happiness_boost,
+                            curiosity: 0.7,
+                            obedience: 0.6, // Default value
+                        },
+                        energy: critter_data.stats.energy,
                         happiness: 0.5,
                     },
                     CritterMovement {
@@ -396,20 +406,20 @@ pub fn critter_spawning_system(
                             let speed = rng.gen_range(30.0..80.0); // Random movement speed
                             Vec2::new(angle.cos() * speed, angle.sin() * speed)
                         },
-                        max_speed: template.base_stats.speed,
+                        max_speed: critter_data.stats.base_speed,
                         acceleration: 100.0,
                         target_position: None,
                     },
                     SpriteAnimation {
                         timer: Timer::from_seconds(1.0 / 10.0, TimerMode::Repeating), // 10 FPS
-                        frame_count: if template.species == CritterSpecies::Bird { 6 } else { 2 },
+                        frame_count: critter_data.sprite.frame_layout.frame_count as usize,
                         current_frame: 0,
                         repeat: true,
                     },
                 )).id();
                 
                 game_state.current_critter_id = Some(critter_entity);
-                console_log!("🎭 Spawned {} at ({}, {})", template.name, event.position.x, event.position.y);
+                console_log!("🎭 Spawned {} at ({}, {})", critter_data.name, event.position.x, event.position.y);
             }
         }
     }
@@ -429,7 +439,7 @@ pub fn auto_spawn_system(
     
     timer.tick(time.delta());
     
-    if timer.just_finished() && game_state.current_critter_id.is_none() && game_state.selected_critter_template.is_some() {
+    if timer.just_finished() && game_state.current_critter_id.is_none() && game_state.selected_critter_id.is_some() {
         let mut rng = thread_rng();
         
         // ALWAYS spawn at center for debugging
@@ -465,6 +475,47 @@ pub fn process_click_on_critters(
             
             console_log!("🎯 Click detected on critter at ({}, {})", critter_pos.x, critter_pos.y);
             return; // Only interact with the first critter found
+        }
+    }
+}
+
+/// Sprite animation system - handles frame-by-frame sprite sheet animation
+pub fn sprite_animation_system(
+    time: Res<Time>,
+    mut animation_query: Query<(&mut SpriteAnimation, &mut Sprite), With<Critter>>,
+) {
+    for (mut animation, mut sprite) in &mut animation_query {
+        animation.timer.tick(time.delta());
+        
+        if animation.timer.just_finished() {
+            // Move to next frame
+            animation.current_frame = (animation.current_frame + 1) % animation.frame_count;
+            
+            // Calculate texture coordinates for sprite sheet (horizontal layout)
+            let frame_width = 1.0 / animation.frame_count as f32;
+            let offset_x = animation.current_frame as f32 * frame_width;
+            
+            // For bird (3000x2000 image with 6 frames): each frame is 500x2000
+            // For bunny (512x512 image with 2 frames): each frame is 256x512  
+            let (image_width, image_height, frame_pixel_width) = if animation.frame_count == 6 {
+                // Bird sprite sheet
+                (3000.0, 2000.0, 500.0)
+            } else {
+                // Bunny sprite sheet (or other)
+                (512.0, 512.0, 256.0)
+            };
+            
+            // Set the rect to show only the current frame
+            sprite.rect = Some(Rect {
+                min: Vec2::new(offset_x * image_width, 0.0),
+                max: Vec2::new((offset_x + frame_width) * image_width, image_height),
+            });
+            
+            console_log!("🎬 Animating frame {}/{} - rect: {:?}", 
+                animation.current_frame + 1, 
+                animation.frame_count,
+                sprite.rect
+            );
         }
     }
 }
