@@ -48,20 +48,20 @@ pub fn load_game_assets(
     asset_server: Res<AssetServer>,
     mut asset_collection: ResMut<AssetCollection>,
 ) {
-    // Load sprite sheets using https:// URLs (bevy_web_asset registers "https" source)
-    console_log!("🎨 Starting asset loading with HTTPS URLs...");
+    // Load sprite sheets using relative URLs that work in browser context
+    console_log!("🎨 Starting asset loading with relative URLs...");
     
-    // Try https:// URLs since bevy_web_asset registers the "https" protocol
-    asset_collection.bird_sprite = asset_server.load("https://localhost:9000/assets/sprites/bird-animation.png");
+    // Use relative paths - the browser will resolve these correctly
+    asset_collection.bird_sprite = asset_server.load("assets/sprites/bird-animation.png");
     console_log!("🐦 Bird sprite handle created: {:?}", asset_collection.bird_sprite);
     
-    asset_collection.bunny_sprite = asset_server.load("https://localhost:9000/assets/sprites/bunny-sprite-sheet.png");  
+    asset_collection.bunny_sprite = asset_server.load("assets/sprites/bunny-sprite-sheet.png");  
     console_log!("🐰 Bunny sprite handle created: {:?}", asset_collection.bunny_sprite);
     
-    // Load audio (keeping original path for now)
+    // Load audio
     asset_collection.positive_sound = asset_server.load("assets/audio/positive/yipee.ogg");
     
-    console_log!("✅ Asset loading initiated with HTTPS URLs");
+    console_log!("✅ Asset loading initiated with relative URLs");
 }
 
 /// Enhanced asset loading status monitoring system with detailed error handling
