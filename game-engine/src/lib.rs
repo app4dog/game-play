@@ -32,6 +32,7 @@ pub fn main() {
     console::log_1(&"🐕 App4.Dog Game Engine Starting...".into());
     
     App::new()
+        .add_plugins(WebAssetPlugin::default())
         .add_plugins(DefaultPlugins
             .set(WindowPlugin {
                 primary_window: Some(Window {
@@ -46,7 +47,6 @@ pub fn main() {
                 meta_check: bevy::asset::AssetMetaCheck::Never,
                 ..default()
             }))
-        .add_plugins(WebAssetPlugin::default())
         .add_plugins(GamePlugin)
         .add_systems(Update, (
             process_load_critter_queue,
