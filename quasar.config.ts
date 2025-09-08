@@ -102,12 +102,16 @@ export default defineConfig((ctx) => {
 
     // Full list of options: https://v2.quasar.dev/quasar-cli-vite/quasar-config-file#devserver
     devServer: {
-      https: true, // Enable HTTPS for WASM asset loading compatibility
+      https: {
+        cert: './certs/play.app4.dog.pem',
+        key: './certs/play.app4.dog-key.pem',
+      },
       open: false, // don't open browser window automatically
-      host: '0.0.0.0',
+      host: 'play.app4.dog',
+      port: 9000,
       // Restrict dev server to approved hostnames only
       server: {
-        allowedHosts: ['play.app4.dog'],
+        allowedHosts: ['play.app4.dog', 'localhost'],
       },
     },
 
