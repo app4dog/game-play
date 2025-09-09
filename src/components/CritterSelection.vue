@@ -155,14 +155,52 @@ onMounted(async () => {
     // Initialize WASM module with explicit URL
     await init('/wasm/critter_keeper_bg.wasm')
     
-    // Load catalog RON
+    // Load pointer-based catalog RON (id -> file path)
     const catalogResponse = await fetch('/critters/catalog.ron')
-    const catalogRon = await catalogResponse.text()
-    
-    // Create critter keeper instance with local base URL
+    const catalogText = await catalogResponse.text()
+
+    // Extract critter file references from RON using a simple regex
+    // Example matches: "chirpy_bird": "chirpy_bird.ron"
+    const entryRegex = /"([^"]+)"\s*:\s*"([^"]+\.ron)"/g
+    const baseDir = '/critters/'
+    const entries: Array<{ id: string; url: string }> = []
+    let match: RegExpExecArray | null
+    while ((match = entryRegex.exec(catalogText)) !== null) {
+      const id = match[1]
+      const refPath = match[2]
+      // Guard: ensure we have both capture groups
+      if (!id || !refPath) {
+        continue
+      }
+      const url: string = refPath.startsWith('/') ? refPath : baseDir + refPath
+      entries.push({ id, url })
+    }
+
+    // Fetch each critter RON and build a full catalog string compatible with WASM
+    const packages: Array<{ id: string; ron: string }> = []
+    for (const e of entries) {
+      const resp = await fetch(e.url)
+      const ron = (await resp.text()).trim()
+      // Validate/extract id from the file (fallback to pointer id)
+      const idMatch = ron.match(/id:\s*"([^"]+)"/)
+      const fileId = idMatch?.[1] || e.id
+      packages.push({ id: fileId, ron })
+    }
+
+    // Compose the final embedded catalog RON for the WASM interface
+    let finalCatalogRon = `(
+    critters: {
+`
+    for (const p of packages) {
+      finalCatalogRon += `        "${p.id}": ${p.ron},\n`
+    }
+    finalCatalogRon += `    }
+)`
+
+    // Create critter keeper instance with composed catalog
     critterKeeper.value = new CritterKeeperWasm(
-      '', // Use relative URLs for same-origin requests
-      catalogRon
+      '', // relative URLs for same-origin requests
+      finalCatalogRon
     )
     
     // Load critter data from WASM module

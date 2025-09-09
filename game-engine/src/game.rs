@@ -10,7 +10,9 @@ impl Plugin for GamePlugin {
         app
             // Resources
             .init_resource::<GameState>()
-            .init_resource::<CritterRegistry>()
+            .init_resource::<RegistryLoadStatus>()
+            .init_resource::<SelectedCritterAsset>()
+            // CritterRegistry must be loaded properly with real data - no Default fallback!
             .init_resource::<AssetCollection>()
             .init_resource::<GameConfig>()
             
@@ -19,10 +21,12 @@ impl Plugin for GamePlugin {
                 setup_camera,
                 setup_ui,
                 load_game_assets,
+                initialize_critter_registry,
             ))
             
             // Update systems
             .add_systems(Update, (
+                try_initialize_registry_from_cache,
                 critter_loading_system,
                 critter_spawning_system,
                 auto_spawn_system,
@@ -92,4 +96,5 @@ pub struct LoadCritterEvent {
     pub critter_id: u32,
     pub name: String,
     pub species: String,
+    pub id: String, // canonical critter ID used by registry
 }

@@ -29,7 +29,7 @@ pub fn main() {
     #[cfg(feature = "console_error_panic_hook")]
     set_panic_hook();
 
-    console::log_1(&"🐕 App4.Dog Game Engine Starting...".into());
+    console::log_1(&"🐕 App4.Dog Game Engine Starting... [v2024-ERROR-CHECK]".into());
     
     App::new()
         .add_plugins(WebAssetPlugin::default())
@@ -109,6 +109,21 @@ impl GameEngine {
                 critter_id,
                 name: name.to_string(),
                 species: species.to_string(),
+                id: name.to_string(), // back-compat bridge (deprecated)
+            });
+        }
+    }
+
+    /// Preferred API: load a critter by canonical ID string
+    #[wasm_bindgen]
+    pub fn load_critter_by_id(&self, id: &str) {
+        console::log_1(&format!("🐶 Loading critter by id: {}", id).into());
+        if let Ok(mut queue) = LOAD_CRITTER_QUEUE.lock() {
+            queue.push_back(LoadCritterEvent {
+                critter_id: 0,
+                name: String::new(),
+                species: String::new(),
+                id: id.to_string(),
             });
         }
     }
@@ -147,18 +162,37 @@ fn process_load_critter_queue(
 fn process_interaction_queue(
     critter_query: Query<(Entity, &Transform), With<components::Critter>>,
     mut interaction_events: EventWriter<game::CritterInteractionEvent>,
+    window_query: Query<&Window>,
+    camera_query: Query<(&Camera, &GlobalTransform)>,
 ) {
     if let Ok(mut queue) = INTERACTION_QUEUE.lock() {
-        while let Some((interaction_type, x, y, _dir_x, _dir_y)) = queue.pop_front() {
-            // Convert screen coordinates to world coordinates and find critter
-            let click_position = Vec2::new(x, y);
+        while let Some((interaction_type, screen_x, screen_y, _dir_x, _dir_y)) = queue.pop_front() {
+            // Convert screen coordinates to world coordinates
+            let Ok(window) = window_query.single() else { continue; };
+            let Ok((camera, camera_transform)) = camera_query.single() else { continue; };
             
-            // Find the closest critter to the click position
+            // Convert screen position to world position
+            let screen_pos = Vec2::new(screen_x, screen_y);
+            let world_pos = if let Ok(world_position) = camera.viewport_to_world_2d(camera_transform, screen_pos) {
+                world_position
+            } else {
+                // Fallback: simple conversion assuming centered camera
+                Vec2::new(screen_x - window.width() / 2.0, window.height() / 2.0 - screen_y)
+            };
+            
+            console::log_1(&format!("🎯 Click at screen ({}, {}) -> world ({}, {})", 
+                screen_x, screen_y, world_pos.x, world_pos.y).into());
+            
+            // Find the closest critter to the click position  
             for (entity, transform) in &critter_query {
                 let critter_pos = transform.translation.xy();
-                let critter_size = 50.0; // Clickable area radius
+                let critter_size = 100.0; // Larger clickable area radius for easier clicking
+                let distance = world_pos.distance(critter_pos);
                 
-                if click_position.distance(critter_pos) <= critter_size {
+                console::log_1(&format!("🎯 Distance to critter at ({}, {}): {:.1}", 
+                    critter_pos.x, critter_pos.y, distance).into());
+                
+                if distance <= critter_size {
                     let interaction_type_enum = match interaction_type.as_str() {
                         "swipe" => game::InteractionType::Swipe(Vec2::ZERO), // Could use dir_x, dir_y
                         "hold" => game::InteractionType::Hold,
@@ -168,10 +202,10 @@ fn process_interaction_queue(
                     interaction_events.write(game::CritterInteractionEvent {
                         critter_entity: entity,
                         interaction_type: interaction_type_enum,
-                        position: click_position,
+                        position: world_pos,
                     });
                     
-                    console::log_1(&format!("🎯 {} interaction sent to critter at ({}, {})", 
+                    console::log_1(&format!("✅ {} interaction sent to critter at ({}, {})", 
                         interaction_type, critter_pos.x, critter_pos.y).into());
                     break; // Only interact with the first critter found
                 }

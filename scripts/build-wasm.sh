@@ -20,23 +20,21 @@ cd game-engine
 # Build for web target using absolute path if needed
 echo "🏗️ Building WASM module..."
 if command -v wasm-pack &> /dev/null; then
-    wasm-pack build --target web --out-dir pkg --release
+    wasm-pack build --target web --out-dir ../public/wasm --release
 else
-    ~/.cargo/bin/wasm-pack build --target web --out-dir pkg --release
+    ~/.cargo/bin/wasm-pack build --target web --out-dir ../public/wasm --release
 fi
 
 # Post-process with wasm-opt for additional size reduction
 if command -v wasm-opt &> /dev/null; then
     echo "🗜️ Optimizing WASM with wasm-opt..."
-    wasm-opt -Oz pkg/app4dog_game_engine_bg.wasm -o pkg/app4dog_game_engine_bg.wasm
+    wasm-opt -Oz ../public/wasm/app4dog_game_engine_bg.wasm -o ../public/wasm/app4dog_game_engine_bg.wasm
 else
     echo "⚠️ wasm-opt not found - install with: npm install -g binaryen"
 fi
 
-# Copy generated files to public directory for Quasar
-echo "📦 Copying WASM files to public directory..."
-mkdir -p ../public/game-engine
-cp -r pkg/* ../public/game-engine/
+# Files are automatically available via symlink: public/game-engine -> game-engine/pkg
+echo "📦 WASM files available via symlink (single source of truth)"
 
 # Generate TypeScript bindings for Vue components
 echo "🔧 Generating TypeScript bindings..."
