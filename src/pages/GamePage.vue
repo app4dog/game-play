@@ -112,7 +112,7 @@ type GameCanvasExposed = {
   pauseGame: () => void
   resumeGame: () => void
   resetGame: () => void
-  getGameEngine: () => unknown | null
+  getGameEngine: () => unknown
   loadCritterById: (id: string) => void
   getCritterInfo: () => { id: number; name: string; species: string; happiness: number; energy: number } | null
 }
