@@ -107,6 +107,15 @@
 import { ref, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import GameCanvas from '../components/GameCanvas.vue'
+// Type for methods exposed by GameCanvas via defineExpose
+type GameCanvasExposed = {
+  pauseGame: () => void
+  resumeGame: () => void
+  resetGame: () => void
+  getGameEngine: () => unknown | null
+  loadCritterById: (id: string) => void
+  getCritterInfo: () => { id: number; name: string; species: string; happiness: number; energy: number } | null
+}
 import CritterSelection from '../components/CritterSelection.vue'
 import GameSettings from '../components/GameSettings.vue'
 
@@ -126,7 +135,7 @@ const currentLevel = ref(1)
 const currentScore = ref(0)
 
 // Game canvas reference
-const gameCanvas = ref<InstanceType<typeof GameCanvas> | null>(null)
+const gameCanvas = ref<GameCanvasExposed | null>(null)
 
 // Initialize game on mount
 onMounted(() => {
