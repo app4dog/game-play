@@ -44,6 +44,7 @@ interface GameEngineApi {
   reset_game(): void
   handle_interaction?(type: string, x: number, y: number, dir_x: number, dir_y: number): void
   load_critter?(critter_id: number, name: string, species: string): void
+  load_critter_by_id?(id: string): void
   get_critter_info?(): { id: number; name: string; species: string; happiness: number; energy: number }
   unload_critter?(): void
   free?(): void
@@ -341,9 +342,13 @@ defineExpose({
   
   // Game engine access methods
   getGameEngine,
-  loadCritter: (critterId: number, name: string, species: string) => {
-    if (gameEngine?.load_critter) {
-      gameEngine.load_critter(critterId, name, species)
+  // New normalized API: pass canonical string id
+  loadCritterById: (id: string) => {
+    if (gameEngine?.load_critter_by_id) {
+      gameEngine.load_critter_by_id(id)
+    } else if (gameEngine?.load_critter) {
+      // Fallback to legacy signature if needed
+      gameEngine.load_critter(0, id, '')
     }
   },
   getCritterInfo: () => {
