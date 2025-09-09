@@ -54,6 +54,7 @@ ron = "0.8"
 wasm-bindgen-futures = "0.4"
 regex-lite = "0.1"
 thiserror = "1.0"
+wasm-bindgen-futures = "0.4"
 # Local critter-keeper crate
 critter-keeper = { path = "../../critter-keeper", default-features = false, features = ["bevy"] }
 # Force older ahash version that uses getrandom 0.2

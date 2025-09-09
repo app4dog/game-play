@@ -61,7 +61,6 @@ impl CritterRegistry {
 
 // No Default implementation! Must be initialized with real critter data using from_ron()
 // This forces proper error handling instead of masking missing data with fallbacks
-
 #[derive(Debug, Clone)]
 pub struct CritterSoundSet {
     pub entry: String,

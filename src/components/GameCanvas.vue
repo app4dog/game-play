@@ -36,6 +36,7 @@ import type { Ref } from 'vue'
 // Type-only import mapped by src/types/game-engine.d.ts
 
 // GameEngineApi now imported from unified types
+// GameEngineApi now imported from unified types
 
 interface GameState {
   score: number
