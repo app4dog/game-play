@@ -614,15 +614,15 @@ pub fn sprite_animation_system(
                         min: Vec2::new(coords.0, coords.1),
                         max: Vec2::new(coords.0 + frame_width, coords.1 + frame_height),
                     });
-                    
-                    console_log!("🎬 Animating frame {}/{} (anim sequence: {}) - Grid coords: ({}, {}) rect: {:?}", 
-                        animation.current_frame + 1, 
-                        animation.frame_count,
-                        animation_frame_index,
-                        coords.0,
-                        coords.1,
-                        sprite.rect
-                    );
+                    // console_log!(
+                    //     "🎬 Animating frame {}/{} (anim sequence: {}) - Grid coords: ({}, {}) rect: {:?}",
+                    //     animation.current_frame + 1,
+                    //     animation.frame_count,
+                    //     animation_frame_index,
+                    //     coords.0,
+                    //     coords.1,
+                    //     sprite.rect
+                    // );
                 } else {
                     console_log!("❌ Invalid frame index {} for critter {}", animation_frame_index, animation.critter_id);
                 }
