@@ -5,6 +5,8 @@ use crate::game::*;
 use web_sys::console;
 use rand::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::JsValue;
+use wasm_bindgen_futures::spawn_local;
 // use bevy::log::info;
 // use bevy::log;
 
@@ -43,6 +45,123 @@ pub fn setup_ui(mut commands: Commands) {
         });
 }
 
+/// Initialize critter registry with real data - fail fast if data is missing!
+/// Shared slot for async loader result: Ok((final_catalog_ron, base_url)) or Err(message)
+static REGISTRY_CATALOG_RESULT: std::sync::Mutex<Option<Result<(String, String), String>>> = std::sync::Mutex::new(None);
+
+#[derive(Resource, Default)]
+pub struct RegistryLoadStatus {
+    pub started: bool,
+    pub completed: bool,
+    pub error: Option<String>,
+}
+
+/// Startup: kick off async fetch of catalog + critter RON files
+pub fn initialize_critter_registry(
+    mut load_status: ResMut<RegistryLoadStatus>,
+) {
+    if load_status.started { return; }
+    load_status.started = true;
+
+    console_log!("📦 Fetching critter catalog and RON packages...");
+
+    spawn_local(async {
+        let result = load_and_compose_catalog().await
+            .map_err(|e| format!("failed to load catalog: {:?}", e));
+        if let Ok(mut slot) = REGISTRY_CATALOG_RESULT.lock() {
+            *slot = Some(result);
+        }
+    });
+}
+
+/// Update: if async result is ready, insert CritterRegistry
+pub fn try_initialize_registry_from_cache(
+    mut commands: Commands,
+    mut load_status: ResMut<RegistryLoadStatus>,
+) {
+    if load_status.completed { return; }
+
+    let Some(result) = REGISTRY_CATALOG_RESULT.lock().ok().and_then(|mut g| g.take()) else { return; };
+    match result {
+        Ok((catalog_ron, base_url)) => {
+            match CritterRegistry::from_ron(&catalog_ron, base_url.clone()) {
+                Ok(registry) => {
+                    commands.insert_resource(registry);
+                    load_status.completed = true;
+                    console_log!("✅ CritterRegistry initialized (base: {})", base_url);
+                }
+                Err(err) => {
+                    load_status.error = Some(format!("from_ron error: {}", err));
+                    console_log!("❌ CritterRegistry::from_ron failed: {}", err);
+                }
+            }
+        }
+        Err(msg) => {
+            load_status.error = Some(msg.clone());
+            console_log!("❌ Critter catalog load failed: {}", msg);
+        }
+    }
+}
+
+async fn fetch_text(url: &str) -> Result<String, JsValue> {
+    let window = web_sys::window().ok_or_else(|| JsValue::from_str("no window"))?;
+    let resp_value = wasm_bindgen_futures::JsFuture::from(window.fetch_with_str(url)).await?;
+    let resp: web_sys::Response = resp_value.dyn_into()?;
+    if !resp.ok() {
+        return Err(JsValue::from_str(&format!("HTTP {} for {}", resp.status(), url)));
+    }
+    let text_promise = resp.text()?;
+    let text = wasm_bindgen_futures::JsFuture::from(text_promise).await?;
+    Ok(text.as_string().unwrap_or_default())
+}
+
+async fn load_and_compose_catalog() -> Result<(String, String), JsValue> {
+    // Base paths
+    let base_dir = "/critters/";
+    let catalog_url = "/critters/catalog.ron";
+
+    // Compute base_url for CritterConfig (origin + trailing slash)
+    let window = web_sys::window().ok_or_else(|| JsValue::from_str("no window"))?;
+    let origin = window.location().origin().map_err(|_| JsValue::from_str("origin error"))?;
+    let base_url = if origin.ends_with('/') { origin } else { format!("{}/", origin) };
+
+    let catalog_text = fetch_text(catalog_url).await?;
+
+    // Parse pointer entries: "id": "file.ron"
+    let mut entries: Vec<(String, String)> = Vec::new();
+    for raw_line in catalog_text.lines() {
+        let line = raw_line.trim();
+        if !line.contains(":") || !line.contains(".ron") { continue; }
+        // Extract first quoted = id, last quoted = file
+        let (id, file) = match (line.find('"'), line.rfind('"')) {
+            (Some(first_q), Some(last_q)) if last_q > first_q => {
+                let rest = &line[first_q+1..];
+                if let Some(end_id_rel) = rest.find('"') {
+                    let id = &rest[..end_id_rel];
+                    let left = &line[..last_q];
+                    if let Some(start_file) = left.rfind('"') {
+                        let file = &line[start_file+1..last_q];
+                        (id.to_string(), file.to_string())
+                    } else { continue }
+                } else { continue }
+            }
+            _ => continue,
+        };
+        if file.ends_with(".ron") { entries.push((id, file)); }
+    }
+
+    // Fetch each critter RON and build final embedded catalog
+    let mut final_catalog = String::from("(\n    critters: {\n");
+    for (id, file) in entries {
+        let url = if file.starts_with('/') { file.clone() } else { format!("{}{}", base_dir, file) };
+        let ron_text = fetch_text(&url).await?;
+        final_catalog.push_str(&format!("        \"{}\": {},\n", id, ron_text.trim()));
+    }
+    final_catalog.push_str("    }\n)");
+
+    Ok((final_catalog, base_url))
+}
+
 /// Asset loading system
 pub fn load_game_assets(
     asset_server: Res<AssetServer>,
@@ -67,7 +186,7 @@ pub fn load_game_assets(
 /// Enhanced asset loading status monitoring system with detailed error handling
 pub fn monitor_asset_loading(
     asset_server: Res<AssetServer>,
-    asset_collection: Res<AssetCollection>,
+    selected_asset: Res<SelectedCritterAsset>,
     mut monitoring_timer: Local<Timer>,
     mut assets_loaded: Local<bool>,
     time: Res<Time>,
@@ -84,53 +203,24 @@ pub fn monitor_asset_loading(
     monitoring_timer.tick(time.delta());
     
     if monitoring_timer.just_finished() {
-        let bird_status = asset_server.get_load_state(&asset_collection.bird_sprite);
-        let bunny_status = asset_server.get_load_state(&asset_collection.bunny_sprite);
-        
-        let bird_loaded = matches!(bird_status, Some(bevy::asset::LoadState::Loaded));
-        let bunny_loaded = matches!(bunny_status, Some(bevy::asset::LoadState::Loaded));
-        
-        // Only log if not both loaded
-        if !(bird_loaded && bunny_loaded) {
-            console_log!("📊 Asset Loading Status Check:");
-            console_log!("🔍 Bird Status: {:?}, Bunny Status: {:?}", bird_status, bunny_status);
-        }
-        
-        // Enhanced bird sprite status checking
-        if let Some(bird_state) = bird_status {
-            match bird_state {
-                bevy::asset::LoadState::NotLoaded => console_log!("🐦 Bird sprite: ⏳ Not loaded yet"),
-                bevy::asset::LoadState::Loading => console_log!("🐦 Bird sprite: 🔄 Loading in progress..."),
-                bevy::asset::LoadState::Loaded => {
+        if let Some(handle) = &selected_asset.handle {
+            let status = asset_server.get_load_state(handle);
+            let url = selected_asset.url.clone().unwrap_or_else(|| "(unknown)".to_string());
+            match status {
+                Some(bevy::asset::LoadState::NotLoaded) => console_log!("🧭 Selected sprite: ⏳ Not loaded yet ({})", url),
+                Some(bevy::asset::LoadState::Loading) => console_log!("🧭 Selected sprite: 🔄 Loading... ({})", url),
+                Some(bevy::asset::LoadState::Loaded) => {
                     if !*assets_loaded {
-                        console_log!("🐦 Bird sprite: ✅ Loaded successfully");
+                        console_log!("🧭 Selected sprite: ✅ Loaded ({})", url);
+                        *assets_loaded = true;
+                        console_log!("🎉 Selected critter sprite loaded. Monitoring stopped.");
                     }
                 },
-                bevy::asset::LoadState::Failed(err) => {
-                    console_log!("🐦 Bird sprite: ❌ Failed to load - Error: {:?}", err);
-                    console_log!("🔧 Trying to diagnose asset loading issue...");
-                }
+                Some(bevy::asset::LoadState::Failed(err)) => console_log!("🧭 Selected sprite: ❌ Failed ({}) - {:?}", url, err),
+                None => console_log!("🧭 Selected sprite: (no status) {}", url),
             }
-        }
-        
-        // Enhanced bunny sprite status checking  
-        if let Some(bunny_state) = bunny_status {
-            match bunny_state {
-                bevy::asset::LoadState::NotLoaded => console_log!("🐰 Bunny sprite: Not loaded"),
-                bevy::asset::LoadState::Loading => console_log!("🐰 Bunny sprite: Loading..."),
-                bevy::asset::LoadState::Loaded => {
-                    if !*assets_loaded {
-                        console_log!("🐰 Bunny sprite: ✅ Loaded successfully");
-                    }
-                },
-                bevy::asset::LoadState::Failed(_) => console_log!("🐰 Bunny sprite: ❌ Failed to load"),
-            }
-        }
-        
-        // Mark as loaded when both assets are loaded
-        if bird_loaded && bunny_loaded {
-            *assets_loaded = true;
-            console_log!("🎉 All sprites loaded successfully! Monitoring stopped.");
+        } else {
+            console_log!("🧭 No selected critter sprite to monitor yet.");
         }
     }
 }
@@ -306,19 +396,20 @@ pub fn ui_update_system(
 pub fn critter_loading_system(
     mut load_events: EventReader<LoadCritterEvent>,
     mut game_state: ResMut<GameState>,
-    critter_registry: Res<CritterRegistry>,
+    critter_registry: Option<Res<CritterRegistry>>,
 ) {
     for event in load_events.read() {
-        // Find critter by name in catalog
-        let critter_id = critter_registry.catalog.critters.iter()
-            .find(|(_, critter)| critter.name.to_lowercase() == event.name.to_lowercase())
-            .map(|(id, _)| id.clone());
-        
-        if let Some(id) = critter_id {
-            game_state.selected_critter_id = Some(id.clone());
-            console_log!("🐶 Critter {} (ID: {}) selected for spawning", event.name, id);
+        // Use canonical ID field
+        let critter_id = &event.id;
+        if let Some(reg) = &critter_registry {
+            if reg.catalog.critters.contains_key(critter_id) {
+                game_state.selected_critter_id = Some(critter_id.clone());
+                console_log!("🐶 Critter ID {} selected for spawning", critter_id);
+            } else {
+                console_log!("⚠️ Unknown critter ID: {}", critter_id);
+            }
         } else {
-            console_log!("⚠️ Unknown critter: {}", event.name);
+            console_log!("⏳ CritterRegistry not ready yet; deferring selection for {}", critter_id);
         }
     }
 }
@@ -328,50 +419,50 @@ pub fn critter_spawning_system(
     mut commands: Commands,
     mut spawn_events: EventReader<SpawnCritterEvent>,
     mut game_state: ResMut<GameState>,
-    critter_registry: Res<CritterRegistry>,
-    asset_collection: Res<AssetCollection>,
+    critter_registry: Option<Res<CritterRegistry>>,
     asset_server: Res<AssetServer>,
+    mut selected_asset: ResMut<SelectedCritterAsset>,
 ) {
     for event in spawn_events.read() {
         // Only spawn if we have a selected critter ID and no current critter
         if let (Some(ref critter_id), None) = (&game_state.selected_critter_id, game_state.current_critter_id) {
-            if let Some(critter_data) = critter_registry.catalog.critters.get(critter_id) {
-                
-                // Check if sprite is loaded, use fallback if not
-                let (sprite_handle, use_fallback) = match critter_data.species {
-                    critter_keeper::CritterSpecies::Bird => {
-                        let handle = asset_collection.bird_sprite.clone();
-                        let status = asset_server.get_load_state(&handle);
-                        console_log!("🐦 Using bird sprite handle, status: {:?}", status);
-                        
-                        match status {
-                            Some(bevy::asset::LoadState::Loaded) => (handle, false),
-                            Some(bevy::asset::LoadState::Failed(_)) => {
-                                console_log!("🐦 Bird sprite failed to load, using fallback");
-                                (handle, true)
-                            },
-                            _ => (handle, false), // Still loading or not started
-                        }
-                    },
-                    critter_keeper::CritterSpecies::Bunny => {
-                        let handle = asset_collection.bunny_sprite.clone();
-                        let status = asset_server.get_load_state(&handle);
-                        console_log!("🐰 Using bunny sprite handle, status: {:?}", status);
-                        
-                        match status {
-                            Some(bevy::asset::LoadState::Loaded) => (handle, false),
-                            Some(bevy::asset::LoadState::Failed(_)) => {
-                                console_log!("🐰 Bunny sprite failed to load, using fallback");
-                                (handle, true)
-                            },
-                            _ => (handle, false), // Still loading or not started
-                        }
-                    }
-                };
-                
+            if let Some(reg) = &critter_registry {
+                if let Some(critter_data) = reg.catalog.critters.get(critter_id) {
+                    // Build absolute URL for sprite
+                    let path = critter_data.sprite.path.clone();
+                    let url = if path.starts_with("http://") || path.starts_with("https://") {
+                        path
+                    } else {
+                        let origin = web_sys::window()
+                            .and_then(|w| w.location().origin().ok())
+                            .unwrap_or_else(|| String::from(""));
+                        if origin.is_empty() { format!("/{}", path.trim_start_matches('/')) }
+                        else { format!("{}/{}", origin.trim_end_matches('/'), path.trim_start_matches('/')) }
+                    };
+                    let sprite_handle: Handle<Image> = asset_server.load(url.clone());
+                    let status = asset_server.get_load_state(&sprite_handle);
+                    console_log!("🖼️ Using sprite URL {} status: {:?}", url, status);
+                    let use_fallback = matches!(status, Some(bevy::asset::LoadState::Failed(_)));
+
+                    // Update selected asset for monitoring
+                    selected_asset.handle = Some(sprite_handle.clone());
+                    selected_asset.url = Some(url.clone());
+
                 console_log!("🖼️ Spawning sprite at position ({}, {}) with scale 0.5", event.position.x, event.position.y);
                 
-                // Spawn critter entity with maximum visibility  
+                // Compute initial frame rect immediately to avoid flashing full sheet
+                let frame_layout = &critter_data.sprite.frame_layout;
+                let frame_coordinates = generate_grid_coordinates(&frame_layout);
+                let idle_animation = critter_data.sprite.animations.get("idle").unwrap_or(
+                    critter_data.sprite.animations.values().next().expect("No animations found")
+                );
+                let first_index = if !idle_animation.frames.is_empty() { idle_animation.frames[0] } else { 0 };
+                let initial_rect = frame_coordinates.get(first_index as usize).map(|coords| Rect {
+                    min: Vec2::new(coords.0, coords.1),
+                    max: Vec2::new(coords.0 + frame_layout.frame_size.0 as f32, coords.1 + frame_layout.frame_size.1 as f32),
+                });
+
+                // Spawn critter entity with maximum visibility
                 let critter_entity = commands.spawn((
                     Sprite {
                         image: if use_fallback { Default::default() } else { sprite_handle },
@@ -380,6 +471,7 @@ pub fn critter_spawning_system(
                         } else { 
                             Color::srgb(1.0, 1.0, 1.0) // White for normal sprite
                         },
+                        rect: initial_rect,
                         custom_size: Some(Vec2::new(200.0, 200.0)), // Force size
                         ..default()
                     },
@@ -411,15 +503,17 @@ pub fn critter_spawning_system(
                         target_position: None,
                     },
                     SpriteAnimation {
-                        timer: Timer::from_seconds(1.0 / 10.0, TimerMode::Repeating), // 10 FPS
+                        timer: Timer::from_seconds(1.0 / 3.0, TimerMode::Repeating), // Slow 3 FPS for calmer animation
                         frame_count: critter_data.sprite.frame_layout.frame_count as usize,
                         current_frame: 0,
                         repeat: true,
+                        critter_id: critter_id.clone(),
                     },
                 )).id();
                 
                 game_state.current_critter_id = Some(critter_entity);
                 console_log!("🎭 Spawned {} at ({}, {})", critter_data.name, event.position.x, event.position.y);
+                }
             }
         }
     }
@@ -479,11 +573,13 @@ pub fn process_click_on_critters(
     }
 }
 
-/// Sprite animation system - handles frame-by-frame sprite sheet animation
+/// Sprite animation system - handles frame-by-frame sprite sheet animation using Grid coordinates from critter-keeper
 pub fn sprite_animation_system(
     time: Res<Time>,
     mut animation_query: Query<(&mut SpriteAnimation, &mut Sprite), With<Critter>>,
+    critter_registry: Option<Res<CritterRegistry>>,
 ) {
+    let Some(critter_registry) = critter_registry else { return; };
     for (mut animation, mut sprite) in &mut animation_query {
         animation.timer.tick(time.delta());
         
@@ -491,31 +587,85 @@ pub fn sprite_animation_system(
             // Move to next frame
             animation.current_frame = (animation.current_frame + 1) % animation.frame_count;
             
-            // Calculate texture coordinates for sprite sheet (horizontal layout)
-            let frame_width = 1.0 / animation.frame_count as f32;
-            let offset_x = animation.current_frame as f32 * frame_width;
-            
-            // For bird (3000x2000 image with 6 frames): each frame is 500x2000
-            // For bunny (512x512 image with 2 frames): each frame is 256x512  
-            let (image_width, image_height, frame_pixel_width) = if animation.frame_count == 6 {
-                // Bird sprite sheet
-                (3000.0, 2000.0, 500.0)
+            // Look up critter data to get frame layout information
+            if let Some(critter_data) = critter_registry.catalog.critters.get(&animation.critter_id) {
+                let frame_layout = &critter_data.sprite.frame_layout;
+                let idle_animation = critter_data.sprite.animations.get("idle").unwrap_or(
+                    critter_data.sprite.animations.values().next().expect("No animations found")
+                );
+                
+                // Generate Grid coordinates for all frames (same logic as Vue component)
+                let frame_coordinates = generate_grid_coordinates(&frame_layout);
+                
+                // Get the current animation frame index from the idle animation sequence
+                let animation_frame_index = if !idle_animation.frames.is_empty() {
+                    idle_animation.frames[animation.current_frame % idle_animation.frames.len()]
+                } else {
+                    animation.current_frame
+                };
+                
+                // Get the actual pixel coordinates for this frame
+                if let Some(coords) = frame_coordinates.get(animation_frame_index as usize) {
+                    let frame_width = frame_layout.frame_size.0 as f32;
+                    let frame_height = frame_layout.frame_size.1 as f32;
+                    
+                    // Set the rect to show only the current frame using Grid coordinates
+                    sprite.rect = Some(Rect {
+                        min: Vec2::new(coords.0, coords.1),
+                        max: Vec2::new(coords.0 + frame_width, coords.1 + frame_height),
+                    });
+                    
+                    console_log!("🎬 Animating frame {}/{} (anim sequence: {}) - Grid coords: ({}, {}) rect: {:?}", 
+                        animation.current_frame + 1, 
+                        animation.frame_count,
+                        animation_frame_index,
+                        coords.0,
+                        coords.1,
+                        sprite.rect
+                    );
+                } else {
+                    console_log!("❌ Invalid frame index {} for critter {}", animation_frame_index, animation.critter_id);
+                }
             } else {
-                // Bunny sprite sheet (or other)
-                (512.0, 512.0, 256.0)
-            };
-            
-            // Set the rect to show only the current frame
-            sprite.rect = Some(Rect {
-                min: Vec2::new(offset_x * image_width, 0.0),
-                max: Vec2::new((offset_x + frame_width) * image_width, image_height),
-            });
-            
-            console_log!("🎬 Animating frame {}/{} - rect: {:?}", 
-                animation.current_frame + 1, 
-                animation.frame_count,
-                sprite.rect
-            );
+                console_log!("❌ Critter data not found for ID: {}", animation.critter_id);
+            }
+        }
+    }
+}
+
+/// Generate Grid coordinates for sprite sheet frames (matches Vue component logic)
+fn generate_grid_coordinates(frame_layout: &critter_keeper::FrameLayout) -> Vec<(f32, f32)> {
+    let frame_width = frame_layout.frame_size.0 as f32;
+    let frame_height = frame_layout.frame_size.1 as f32;
+    
+    match &frame_layout.layout {
+        critter_keeper::LayoutType::Grid { cols, rows } => {
+            let mut coordinates = Vec::new();
+            for row in 0..*rows {
+                // Bevy's sprite rect uses bottom-left origin; invert Y from top-left grid
+                let inv_row = rows - 1 - row;
+                for col in 0..*cols {
+                    coordinates.push((
+                        col as f32 * frame_width,
+                        inv_row as f32 * frame_height
+                    ));
+                }
+            }
+            coordinates
+        },
+        critter_keeper::LayoutType::Horizontal => {
+            // Fallback to horizontal layout if needed
+            (0..frame_layout.frame_count).map(|i| (i as f32 * frame_width, 0.0)).collect()
+        },
+        critter_keeper::LayoutType::Vertical => {
+            // Fallback to vertical layout if needed
+            // Invert Y so index 0 corresponds to top frame, matching Canvas logic
+            (0..frame_layout.frame_count)
+                .map(|i| {
+                    let inv_i = (frame_layout.frame_count - 1 - i) as f32;
+                    (0.0, inv_i * frame_height)
+                })
+                .collect()
         }
     }
 }

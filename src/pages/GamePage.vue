@@ -214,12 +214,9 @@ const onCritterSelected = (critter: { id: string; name: string; species: string 
   
   // Communicate selected critter to WASM game engine
   const gameCanvasComponent = gameCanvas.value
-  if (gameCanvasComponent && gameCanvasComponent.loadCritter) {
-    // Map critter ID from string to number (simple hash or use index)
-    const critterId = critter.id === 'chirpy' ? 1 : critter.id === 'bouncy' ? 2 : 0
-    
-    console.log(`🐶 Loading critter in game engine: ${critter.name}`)
-    gameCanvasComponent.loadCritter(critterId, critter.name, critter.species)
+  if (gameCanvasComponent?.loadCritterById) {
+    console.log(`🐶 Loading critter in game engine by id: ${critter.id}`)
+    gameCanvasComponent.loadCritterById(critter.id)
   } else {
     console.warn('⚠️ Game engine not ready for critter loading')
   }

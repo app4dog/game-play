@@ -42,6 +42,7 @@ pub struct SpriteAnimation {
     pub frame_count: usize,
     pub current_frame: usize,
     pub repeat: bool,
+    pub critter_id: String, // ID to look up frame layout in CritterRegistry
 }
 
 /// Interactive area component

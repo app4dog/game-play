@@ -21,6 +21,13 @@ pub struct AssetCollection {
     pub default_material: Handle<StandardMaterial>,
 }
 
+/// Track the currently selected critter's primary sprite asset for monitoring
+#[derive(Resource, Default)]
+pub struct SelectedCritterAsset {
+    pub handle: Option<Handle<Image>>,
+    pub url: Option<String>,
+}
+
 /// Critter registry for managing different anthropomorphic game characters using critter-keeper
 #[derive(Resource)]
 pub struct CritterRegistry {
@@ -50,53 +57,8 @@ impl CritterRegistry {
     }
 }
 
-impl Default for CritterRegistry {
-    fn default() -> Self {
-        // Create a minimal catalog for fallback
-        let catalog_ron = r#"
-        (
-            critters: {
-                "chirpy_bird": (
-                    id: "chirpy_bird",
-                    name: "Chirpy",
-                    species: Bird,
-                    sprite: (
-                        path: "assets/sprites/bird-animation.png",
-                        frame_layout: (
-                            image_size: (3000, 2000),
-                            frame_count: 6,
-                            frame_size: (1000, 1000),
-                            layout: Grid(cols: 3, rows: 2),
-                        ),
-                        animations: {
-                            "idle": (
-                                frames: [0, 1, 2, 3, 4, 5],
-                                fps: 8.0,
-                                looping: true,
-                            ),
-                        },
-                    ),
-                    motion: (
-                        movement_type: Wander(radius: 300.0, center_attraction: 0.4),
-                        path_behavior: Bounce,
-                        speed_variation: (0.7, 1.3),
-                        direction_change_frequency: 1.5,
-                    ),
-                    stats: (
-                        base_speed: 150.0,
-                        energy: 100.0,
-                        happiness_boost: 0.2,
-                        size_multiplier: 1.0,
-                    ),
-                ),
-            }
-        )
-        "#;
-        
-        Self::from_ron(catalog_ron, "assets/".to_string())
-            .expect("Failed to create default critter registry")
-    }
-}
+// No Default implementation! Must be initialized with real critter data using from_ron()
+// This forces proper error handling instead of masking missing data with fallbacks
 
 #[derive(Debug, Clone)]
 pub struct CritterTemplate {
