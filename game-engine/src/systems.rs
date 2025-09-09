@@ -462,6 +462,11 @@ pub fn critter_spawning_system(
                     max: Vec2::new(coords.0 + frame_layout.frame_size.0 as f32, coords.1 + frame_layout.frame_size.1 as f32),
                 });
 
+                // Determine animation FPS from critter data (speed up a bit)
+                let base_fps = idle_animation.fps.max(1.0);
+                let speed_multiplier: f32 = 1.75; // global speed-up factor
+                let target_fps = (base_fps * speed_multiplier).clamp(1.0, 60.0);
+
                 // Spawn critter entity with maximum visibility
                 let critter_entity = commands.spawn((
                     Sprite {
@@ -503,7 +508,7 @@ pub fn critter_spawning_system(
                         target_position: None,
                     },
                     SpriteAnimation {
-                        timer: Timer::from_seconds(1.0 / 3.0, TimerMode::Repeating), // Slow 3 FPS for calmer animation
+                        timer: Timer::from_seconds(1.0 / target_fps, TimerMode::Repeating),
                         frame_count: critter_data.sprite.frame_layout.frame_count as usize,
                         current_frame: 0,
                         repeat: true,
