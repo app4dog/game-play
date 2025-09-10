@@ -56,6 +56,34 @@ pub(crate) fn set_available_critters(list: Vec<CritterSummary>) {
     }
 }
 
+// Shared critter list snapshot for UI consumption
+#[derive(Clone, Debug)]
+pub struct CritterSummary {
+    pub id: String,
+    pub name: String,
+    pub species: String,
+    pub sprite_url: String,
+    // Preview/animation metadata (idle)
+    pub frame_width: f32,
+    pub frame_height: f32,
+    pub idle_fps: f32,
+    pub idle_frame_coords: Vec<(f32, f32)>, // ordered list of (x,y) for idle frames
+    // Raw critter stats for display
+    pub stat_base_speed: f32,
+    pub stat_energy: f32,
+    pub stat_happiness_boost: f32,
+}
+
+static CRITTER_LIST: Mutex<Vec<CritterSummary>> = Mutex::new(Vec::new());
+static CRITTERS_READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub(crate) fn set_available_critters(list: Vec<CritterSummary>) {
+    if let Ok(mut g) = CRITTER_LIST.lock() {
+        *g = list;
+        CRITTERS_READY.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 // Enable better panic messages in development
 #[cfg(feature = "console_error_panic_hook")]
 pub fn set_panic_hook() {
@@ -424,6 +452,46 @@ pub fn send_event_to_bevy(event_json: &str) -> Result<(), JsValue> {
 #[wasm_bindgen]  
 pub fn send_audio_response(response_json: &str) -> Result<(), JsValue> {
     send_audio_response_to_bevy(response_json)
+}
+
+/// Free functions to allow UI to query available critters without holding a GameEngine instance
+#[wasm_bindgen]
+pub fn critters_ready() -> bool {
+    CRITTERS_READY.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[wasm_bindgen]
+pub fn get_available_critters() -> js_sys::Array {
+    let arr = js_sys::Array::new();
+    if let Ok(g) = CRITTER_LIST.lock() {
+        for c in g.iter() {
+            let o = js_sys::Object::new();
+            let _ = js_sys::Reflect::set(&o, &"id".into(), &c.id.clone().into());
+            let _ = js_sys::Reflect::set(&o, &"name".into(), &c.name.clone().into());
+            let _ = js_sys::Reflect::set(&o, &"species".into(), &c.species.clone().into());
+            let _ = js_sys::Reflect::set(&o, &"sprite".into(), &c.sprite_url.clone().into());
+            // Animation/preview fields
+            let _ = js_sys::Reflect::set(&o, &"frameWidth".into(), &c.frame_width.into());
+            let _ = js_sys::Reflect::set(&o, &"frameHeight".into(), &c.frame_height.into());
+            let _ = js_sys::Reflect::set(&o, &"idleFps".into(), &c.idle_fps.into());
+            let frames_arr = js_sys::Array::new();
+            for (x, y) in c.idle_frame_coords.iter() {
+                let fo = js_sys::Object::new();
+                let _ = js_sys::Reflect::set(&fo, &"x".into(), &(*x).into());
+                let _ = js_sys::Reflect::set(&fo, &"y".into(), &(*y).into());
+                frames_arr.push(&fo);
+            }
+            let _ = js_sys::Reflect::set(&o, &"frames".into(), &frames_arr);
+            // Stats
+            let stats = js_sys::Object::new();
+            let _ = js_sys::Reflect::set(&stats, &"baseSpeed".into(), &c.stat_base_speed.into());
+            let _ = js_sys::Reflect::set(&stats, &"energy".into(), &c.stat_energy.into());
+            let _ = js_sys::Reflect::set(&stats, &"happinessBoost".into(), &c.stat_happiness_boost.into());
+            let _ = js_sys::Reflect::set(&o, &"stats".into(), &stats);
+            arr.push(&o);
+        }
+    }
+    arr
 }
 
 // Systems to process the event queues from WASM interface
