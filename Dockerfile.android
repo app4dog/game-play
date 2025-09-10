@@ -1,0 +1,49 @@
+# Stage 1: Get artifacts from local Docker image
+FROM app4dog-artifacts:latest AS artifacts
+
+# Stage 2: Use official Android build image with Java and Gradle pre-installed
+FROM docker.io/cimg/android:2024.01.1-node
+
+# Install pnpm globally as root
+USER root
+RUN npm install -g pnpm
+
+# Set working directory and change ownership to circleci user
+WORKDIR /app
+RUN chown -R circleci:circleci /app
+
+# Switch back to circleci user
+USER circleci
+
+# Copy source code (including package.json) 
+COPY --chown=circleci:circleci . .
+
+# Copy artifacts from the artifacts stage
+COPY --from=artifacts --chown=circleci:circleci /artifacts ./artifacts
+
+# Install Node.js dependencies
+RUN pnpm install --frozen-lockfile
+
+# Build the web app
+RUN pnpm run build
+
+# Sync with Capacitor
+RUN npx cap sync android
+
+# Set Android environment variables
+ENV ANDROID_HOME=/opt/android/sdk
+ENV PATH=$PATH:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools
+
+# Build the APK with increased memory and compatibility settings
+WORKDIR /app/android
+ENV GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
+RUN ./gradlew assembleDebug --no-daemon --stacktrace
+
+# Copy APK to output directory
+RUN mkdir -p /app/output
+RUN cp app/build/outputs/apk/debug/*.apk /app/output/
+
+# Set the output directory as volume
+VOLUME ["/app/output"]
+
+CMD ["echo", "APK build complete! Check /app/output/ for the APK file."]

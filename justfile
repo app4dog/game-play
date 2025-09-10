@@ -44,6 +44,11 @@ dev-android: build-wasm
     npx cap sync android
     npx cap run android
 
+# Build Android APK using Docker (no local Android SDK required)
+build-android-docker: build-wasm build
+    @echo "🐳 Building Android APK using Docker..."
+    ./build-android.sh
+
 dev-ios: build-wasm
     @echo "📱 Starting iOS development..."
     pnpm run build
