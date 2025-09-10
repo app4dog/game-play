@@ -87,6 +87,90 @@ pub fn try_initialize_registry_from_cache(
         Ok((catalog_ron, base_url, sounds_map)) => {
             match CritterRegistry::from_ron(&catalog_ron, base_url.clone()) {
                 Ok(registry) => {
+                    // Build critter summaries BEFORE moving registry into resources
+                    let mut list: Vec<crate::CritterSummary> = Vec::new();
+                    for (id, critter) in registry.catalog.critters.iter() {
+                        let path = critter.sprite.path.clone();
+                        let url = if path.starts_with("http://") || path.starts_with("https://") {
+                            path
+                        } else if base_url.is_empty() {
+                            format!("/{}", path.trim_start_matches('/'))
+                        } else {
+                            format!("{}/{}", base_url.trim_end_matches('/'), path.trim_start_matches('/'))
+                        };
+                        let species = match critter.species {
+                            critter_keeper::CritterSpecies::Bird => "Bird",
+                            critter_keeper::CritterSpecies::Bunny => "Bunny",
+                        }.to_string();
+
+                        // Frame layout and idle animation extraction
+                        let frame_layout = &critter.sprite.frame_layout;
+                        let frame_width = frame_layout.frame_size.0 as f32;
+                        let frame_height = frame_layout.frame_size.1 as f32;
+                        let idle_anim = critter
+                            .sprite
+                            .animations
+                            .get("idle")
+                            .or_else(|| critter.sprite.animations.values().next())
+                            .expect("No animations found in critter");
+                        let idle_fps = idle_anim.fps as f32;
+
+                        // Build grid coordinates for all frames (DRY with engine logic)
+                        let coords = {
+                            match &frame_layout.layout {
+                                critter_keeper::LayoutType::Grid { cols, rows } => {
+                                    let mut coordinates = Vec::new();
+                                    for row in 0..*rows {
+                                        let inv_row = rows - 1 - row;
+                                        for col in 0..*cols {
+                                            coordinates.push((
+                                                col as f32 * frame_width,
+                                                inv_row as f32 * frame_height,
+                                            ));
+                                        }
+                                    }
+                                    coordinates
+                                }
+                                critter_keeper::LayoutType::Horizontal => {
+                                    (0..frame_layout.frame_count)
+                                        .map(|i| (i as f32 * frame_width, 0.0))
+                                        .collect()
+                                }
+                                critter_keeper::LayoutType::Vertical => {
+                                    (0..frame_layout.frame_count)
+                                        .map(|i| {
+                                            let inv_i = (frame_layout.frame_count - 1 - i) as f32;
+                                            (0.0, inv_i * frame_height)
+                                        })
+                                        .collect()
+                                }
+                            }
+                        };
+                        // Map idle frame indices to coordinates
+                        let mut idle_coords: Vec<(f32, f32)> = Vec::new();
+                        for idx in idle_anim.frames.iter() {
+                            let i = (*idx as usize).min(coords.len().saturating_sub(1));
+                            idle_coords.push(coords[i]);
+                        }
+
+                        // Stats as source-of-truth values
+                        let stats = &critter.stats;
+
+                        list.push(crate::CritterSummary {
+                            id: id.clone(),
+                            name: critter.name.clone(),
+                            species,
+                            sprite_url: url,
+                            frame_width,
+                            frame_height,
+                            idle_fps,
+                            idle_frame_coords: idle_coords,
+                            stat_base_speed: stats.base_speed as f32,
+                            stat_energy: stats.energy as f32,
+                            stat_happiness_boost: stats.happiness_boost as f32,
+                        });
+                    }
+                    // Now move registry into resources
                     commands.insert_resource(registry);
                     // Convert sounds_map into CritterSounds resource
                     let mut cs = CritterSounds::default();
@@ -94,6 +178,8 @@ pub fn try_initialize_registry_from_cache(
                         cs.sounds.insert(id, CritterSoundSet { entry, success });
                     }
                     commands.insert_resource(cs);
+                    // Publish critter list snapshots for UI
+                    crate::set_available_critters(list);
                     load_status.completed = true;
                     console_log!("✅ CritterRegistry initialized (base: {})", base_url);
                 }
@@ -346,15 +432,30 @@ pub fn critter_interaction_system(
                     if let (Some(sounds_res), Some(anim)) = (&critter_sounds, anim) {
                         if let Some(set) = sounds_res.sounds.get(&anim.critter_id) {
                             let success_path = &set.success;
-                            // Use relative paths for better compatibility
-                            let url = if success_path.starts_with("http") { 
-                                success_path.clone() 
-                            } else { 
-                                format!("/{}", success_path.trim_start_matches('/'))
+                            // Prefer relative paths to respect BASE_URL/subpaths
+                            let url = if success_path.starts_with("http") {
+                                success_path.clone()
+                            } else {
+                                success_path.trim_start_matches('/').to_string()
                             };
                             if let Ok(audio) = HtmlAudioElement::new_with_src(&url) {
-                                let _ = audio.play();
-                                console_log!("🔊 Success sound playing (web): {}", url);
+                                // Attempt to play and surface any async errors
+                                match audio.play() {
+                                    Ok(promise) => {
+                                        let url_c = url.clone();
+                                        wasm_bindgen_futures::spawn_local(async move {
+                                            if let Err(e) = wasm_bindgen_futures::JsFuture::from(promise).await {
+                                                console_log!("❌ Audio play rejected for {}: {:?}", url_c, e);
+                                            }
+                                        });
+                                        console_log!("🔊 Success sound playing (web): {}", url);
+                                    }
+                                    Err(err) => {
+                                        console_log!("❌ audio.play() error for {}: {:?}", url, err);
+                                    }
+                                }
+                            } else {
+                                console_log!("❌ Failed to create HtmlAudioElement for {}", url);
                             }
                         }
                     }
@@ -560,15 +661,29 @@ pub fn critter_spawning_system(
                     if let Some(sounds_res) = &critter_sounds {
                         if let Some(set) = sounds_res.sounds.get(critter_id) {
                             let entry_path = &set.entry;
-                            // Use relative paths for better compatibility
-                            let url = if entry_path.starts_with("http") { 
-                                entry_path.clone() 
-                            } else { 
-                                format!("/{}", entry_path.trim_start_matches('/'))
+                            // Prefer relative paths to respect BASE_URL/subpaths
+                            let url = if entry_path.starts_with("http") {
+                                entry_path.clone()
+                            } else {
+                                entry_path.trim_start_matches('/').to_string()
                             };
                             if let Ok(audio) = HtmlAudioElement::new_with_src(&url) {
-                                let _ = audio.play();
-                                console_log!("🔊 Entry sound playing (web): {}", url);
+                                match audio.play() {
+                                    Ok(promise) => {
+                                        let url_c = url.clone();
+                                        wasm_bindgen_futures::spawn_local(async move {
+                                            if let Err(e) = wasm_bindgen_futures::JsFuture::from(promise).await {
+                                                console_log!("❌ Audio play rejected for {}: {:?}", url_c, e);
+                                            }
+                                        });
+                                        console_log!("🔊 Entry sound playing (web): {}", url);
+                                    }
+                                    Err(err) => {
+                                        console_log!("❌ audio.play() error for {}: {:?}", url, err);
+                                    }
+                                }
+                            } else {
+                                console_log!("❌ Failed to create HtmlAudioElement for {}", url);
                             }
                         }
                     }
@@ -767,4 +882,3 @@ pub fn window_resize_system(
         );
     }
 }
-
