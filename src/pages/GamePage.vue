@@ -61,6 +61,13 @@
             class="full-width q-mb-sm"
           />
           <q-btn
+            color="positive"
+            label="Play Test Sound"
+            size="md"
+            @click="playTestSound"
+            class="full-width q-mb-sm"
+          />
+          <q-btn
             color="secondary"
             label="Select Critter"
             size="md"
@@ -199,6 +206,32 @@ const startGame = () => {
 const retryInit = () => {
   gameErrorDialog.value = false
   initializeGame()
+}
+
+// Simple test sound playback using a real .mp3/.ogg asset path
+const playTestSound = async () => {
+  const base = import.meta.env.BASE_URL
+  const candidates = [
+    `${base}assets/audio/positive/yipee.mp3`,
+    `${base}assets/audio/positive/yipee.ogg`,
+  ]
+  // Pick the first that responds OK to HEAD; otherwise use first
+  let url = candidates[0]!
+  for (const cand of candidates) {
+    try {
+      const res = await fetch(cand, { method: 'HEAD' })
+      if (res.ok) { url = cand; break }
+    } catch { /* ignore */ }
+  }
+  try {
+    const audio = new Audio(url)
+    audio.preload = 'auto'
+    await audio.play()
+    $q.notify({ type: 'positive', message: `🔊 Playing: ${url}`, position: 'top' })
+  } catch (err) {
+    console.error('Audio play failed', err)
+    $q.notify({ type: 'negative', message: '❌ Failed to play sound', caption: String(err), position: 'top' })
+  }
 }
 
 const startTrainingMode = () => {
