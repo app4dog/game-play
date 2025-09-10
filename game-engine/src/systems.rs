@@ -470,6 +470,7 @@ pub fn critter_interaction_system(
                             } else {
                                 console_log!("❌ Failed to create HtmlAudioElement for {}", url);
                             }
+                            }
                         }
                     }
                     
@@ -703,6 +704,7 @@ pub fn critter_spawning_system(
                                 }
                             } else {
                                 console_log!("❌ Failed to create HtmlAudioElement for {}", url);
+                            }
                             }
                         }
                     }

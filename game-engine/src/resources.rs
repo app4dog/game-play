@@ -80,6 +80,24 @@ pub struct AudioGate {
 
 
 #[derive(Debug, Clone)]
+pub struct CritterSoundSet {
+    pub entry: String,
+    pub success: String,
+}
+
+#[derive(Resource, Default)]
+pub struct CritterSounds {
+    pub sounds: HashMap<String, CritterSoundSet>, // critter_id -> sounds
+}
+
+/// Gate to ensure audio plays only after a user gesture (browser autoplay policy)
+#[derive(Resource, Default)]
+pub struct AudioGate {
+    pub enabled: bool,
+}
+
+
+#[derive(Debug, Clone)]
 pub struct CritterTemplate {
     pub name: String,
     pub species: CritterSpecies,
