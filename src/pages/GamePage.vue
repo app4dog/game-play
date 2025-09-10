@@ -611,7 +611,11 @@ const testVirtualCollar = async () => {
   } catch (error) {
     console.error('Failed to test virtual collar:', error)
     $q.notify({ type: 'negative', message: '❌ Failed to test virtual collar', position: 'top' })
+=======
+>>>>>>> 7e828c4 (Audio: Make test sound playback robust by sequentially trying MP3/OGG candidates without HEAD (works across CORS))
   }
+  console.error('Audio play failed for all candidates', { candidates, lastError })
+  $q.notify({ type: 'negative', message: '❌ Failed to play any test sound', caption: String(lastError ?? 'Unknown error'), position: 'top' })
 }
 
 const startTrainingMode = () => {
