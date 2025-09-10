@@ -12,6 +12,7 @@ impl Plugin for GamePlugin {
             .init_resource::<GameState>()
             .init_resource::<RegistryLoadStatus>()
             .init_resource::<SelectedCritterAsset>()
+            .init_resource::<AudioGate>()
             // CritterRegistry must be loaded properly with real data - no Default fallback!
             .init_resource::<AssetCollection>()
             .init_resource::<GameConfig>()
