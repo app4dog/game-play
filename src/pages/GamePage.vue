@@ -390,7 +390,7 @@ const playTestSound = async () => {
   console.error('Audio play failed for all candidates', { candidates, lastError })
   $q.notify({ type: 'negative', message: '❌ Failed to play any test sound', caption: describeError(lastError), position: 'top' })
 }
- 
+
 const testBevyAudio = async () => {
   // Initialize AudioContext on first user interaction
   await gameCanvas.value?.initializeAudioContext()
@@ -426,6 +426,12 @@ const testBevyAudioProvided = async () => {
   if (!gameCanvas.value) {
     $q.notify({ type: 'warning', message: '❌ Game engine not ready', position: 'top' })
     return
+=======
+      const res = await fetch(cand, { method: 'HEAD' })
+      const ct = res.headers.get('content-type') || ''
+      if (res.ok && ct.toLowerCase().includes('audio')) { url = cand; break }
+    } catch { /* ignore */ }
+>>>>>>> 55a3b8e (Audio: Improve Play Test Sound button with content-type check and CORS-enabled MP3 fallback)
   }
   try {
     const gameEngine = gameCanvas.value.getGameEngine()
