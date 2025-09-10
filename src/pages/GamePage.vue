@@ -214,13 +214,16 @@ const playTestSound = async () => {
   const candidates = [
     `${base}assets/audio/positive/yipee.mp3`,
     `${base}assets/audio/positive/yipee.ogg`,
+    // Public CORS-enabled fallback (MP3)
+    'https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3',
   ]
   // Pick the first that responds OK to HEAD; otherwise use first
   let url = candidates[0]!
   for (const cand of candidates) {
     try {
       const res = await fetch(cand, { method: 'HEAD' })
-      if (res.ok) { url = cand; break }
+      const ct = res.headers.get('content-type') || ''
+      if (res.ok && ct.toLowerCase().includes('audio')) { url = cand; break }
     } catch { /* ignore */ }
   }
   try {
