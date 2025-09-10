@@ -387,6 +387,7 @@ const playTestSound = async () => {
     try { return JSON.stringify(err) } catch { /* ignore */ }
     return 'Unknown error'
   }
+<<<<<<< HEAD
   console.error('Audio play failed for all candidates', { candidates, lastError })
   $q.notify({ type: 'negative', message: '❌ Failed to play any test sound', caption: describeError(lastError), position: 'top' })
 }
@@ -614,8 +615,10 @@ const testVirtualCollar = async () => {
 =======
 >>>>>>> 7e828c4 (Audio: Make test sound playback robust by sequentially trying MP3/OGG candidates without HEAD (works across CORS))
   }
+=======
+>>>>>>> 5866e87 (ESLint: Use robust error stringification in Play Test Sound notify)
   console.error('Audio play failed for all candidates', { candidates, lastError })
-  $q.notify({ type: 'negative', message: '❌ Failed to play any test sound', caption: String(lastError ?? 'Unknown error'), position: 'top' })
+  $q.notify({ type: 'negative', message: '❌ Failed to play any test sound', caption: describeError(lastError), position: 'top' })
 }
 
 const startTrainingMode = () => {
