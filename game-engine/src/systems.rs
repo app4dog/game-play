@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use web_sys::HtmlAudioElement;
 use crate::components::*;
 use crate::resources::*;
 use crate::game::*;
@@ -47,7 +48,7 @@ pub fn setup_ui(mut commands: Commands) {
 
 /// Initialize critter registry with real data - fail fast if data is missing!
 /// Shared slot for async loader result: Ok((final_catalog_ron, base_url)) or Err(message)
-static REGISTRY_CATALOG_RESULT: std::sync::Mutex<Option<Result<(String, String), String>>> = std::sync::Mutex::new(None);
+static REGISTRY_CATALOG_RESULT: std::sync::Mutex<Option<Result<(String, String, std::collections::HashMap<String, (String, String)>), String>>> = std::sync::Mutex::new(None);
 
 #[derive(Resource, Default)]
 pub struct RegistryLoadStatus {
@@ -83,10 +84,16 @@ pub fn try_initialize_registry_from_cache(
 
     let Some(result) = REGISTRY_CATALOG_RESULT.lock().ok().and_then(|mut g| g.take()) else { return; };
     match result {
-        Ok((catalog_ron, base_url)) => {
+        Ok((catalog_ron, base_url, sounds_map)) => {
             match CritterRegistry::from_ron(&catalog_ron, base_url.clone()) {
                 Ok(registry) => {
                     commands.insert_resource(registry);
+                    // Convert sounds_map into CritterSounds resource
+                    let mut cs = CritterSounds::default();
+                    for (id, (entry, success)) in sounds_map.into_iter() {
+                        cs.sounds.insert(id, CritterSoundSet { entry, success });
+                    }
+                    commands.insert_resource(cs);
                     load_status.completed = true;
                     console_log!("✅ CritterRegistry initialized (base: {})", base_url);
                 }
@@ -115,7 +122,7 @@ async fn fetch_text(url: &str) -> Result<String, JsValue> {
     Ok(text.as_string().unwrap_or_default())
 }
 
-async fn load_and_compose_catalog() -> Result<(String, String), JsValue> {
+async fn load_and_compose_catalog() -> Result<(String, String, std::collections::HashMap<String, (String, String)>), JsValue> {
     // Base paths
     let base_dir = "/critters/";
     let catalog_url = "/critters/catalog.ron";
@@ -126,6 +133,7 @@ async fn load_and_compose_catalog() -> Result<(String, String), JsValue> {
     let base_url = if origin.ends_with('/') { origin } else { format!("{}/", origin) };
 
     let catalog_text = fetch_text(catalog_url).await?;
+    let mut sounds_map: std::collections::HashMap<String, (String, String)> = std::collections::HashMap::new();
 
     // Parse pointer entries: "id": "file.ron"
     let mut entries: Vec<(String, String)> = Vec::new();
@@ -155,11 +163,19 @@ async fn load_and_compose_catalog() -> Result<(String, String), JsValue> {
     for (id, file) in entries {
         let url = if file.starts_with('/') { file.clone() } else { format!("{}{}", base_dir, file) };
         let ron_text = fetch_text(&url).await?;
+        // Extract optional sounds mapping: sounds: (entry: "...", success: "...")
+        let entry_pat = regex_lite::Regex::new("entry\\s*:\\s*\"([^\"]+)\"").unwrap();
+        let success_pat = regex_lite::Regex::new("success\\s*:\\s*\"([^\"]+)\"").unwrap();
+        let entry = entry_pat.captures(&ron_text).and_then(|c| c.get(1)).map(|m| m.as_str().to_string());
+        let success = success_pat.captures(&ron_text).and_then(|c| c.get(1)).map(|m| m.as_str().to_string());
+        if let (Some(e), Some(s)) = (entry, success) {
+            sounds_map.insert(id.clone(), (e, s));
+        }
         final_catalog.push_str(&format!("        \"{}\": {},\n", id, ron_text.trim()));
     }
     final_catalog.push_str("    }\n)");
 
-    Ok((final_catalog, base_url))
+    Ok((final_catalog, base_url, sounds_map))
 }
 
 /// Asset loading system
@@ -178,7 +194,7 @@ pub fn load_game_assets(
     console_log!("🐰 Bunny sprite handle created: {:?}", asset_collection.bunny_sprite);
     
     // Load audio
-    asset_collection.positive_sound = asset_server.load("https://play.app4.dog:9000/assets/audio/positive/yipee.ogg");
+    asset_collection.positive_sound = asset_server.load("assets/audio/positive/yipee.mp3");
     
     console_log!("✅ Asset loading initiated with HTTPS URLs");
 }
@@ -301,14 +317,19 @@ pub fn critter_movement_system(
 pub fn critter_interaction_system(
     mut commands: Commands,
     mut interaction_events: EventReader<CritterInteractionEvent>,
-    critter_query: Query<(Entity, &Critter, &Transform)>,
+    critter_query: Query<(Entity, &Critter, &Transform, Option<&SpriteAnimation>)>,
     mut game_progress_events: EventWriter<GameProgressEvent>,
     mut game_state: ResMut<GameState>,
+    asset_server: Res<AssetServer>,
+    critter_sounds: Option<Res<CritterSounds>>,
+    mut audio_gate: ResMut<AudioGate>,
 ) {
     for event in interaction_events.read() {
-        if let Ok((entity, critter, transform)) = critter_query.get(event.critter_entity) {
+        if let Ok((entity, critter, transform, anim)) = critter_query.get(event.critter_entity) {
             match event.interaction_type {
                 InteractionType::Tap => {
+                    // Unlock audio due to user gesture
+                    audio_gate.enabled = true;
                     // When critter is tapped, it disappears and gives points
                     commands.entity(entity).despawn();
                     
@@ -321,6 +342,22 @@ pub fn critter_interaction_system(
                         score_change: 50, // Higher score for successfully catching a critter
                         achievement: Some(format!("{} caught!", critter.name)),
                     });
+                    // Play success sound from catalog (if present)
+                    if let (Some(sounds_res), Some(anim)) = (&critter_sounds, anim) {
+                        if let Some(set) = sounds_res.sounds.get(&anim.critter_id) {
+                            let success_path = &set.success;
+                            // Use relative paths for better compatibility
+                            let url = if success_path.starts_with("http") { 
+                                success_path.clone() 
+                            } else { 
+                                format!("/{}", success_path.trim_start_matches('/'))
+                            };
+                            if let Ok(audio) = HtmlAudioElement::new_with_src(&url) {
+                                let _ = audio.play();
+                                console_log!("🔊 Success sound playing (web): {}", url);
+                            }
+                        }
+                    }
                     
                     console_log!("🎯 {} was caught and disappeared!", critter.name);
                 }
@@ -422,6 +459,8 @@ pub fn critter_spawning_system(
     critter_registry: Option<Res<CritterRegistry>>,
     asset_server: Res<AssetServer>,
     mut selected_asset: ResMut<SelectedCritterAsset>,
+    critter_sounds: Option<Res<CritterSounds>>,
+    audio_gate: Res<AudioGate>,
 ) {
     for event in spawn_events.read() {
         // Only spawn if we have a selected critter ID and no current critter
@@ -516,6 +555,25 @@ pub fn critter_spawning_system(
                     },
                 )).id();
                 
+                // Play entry sound from catalog-defined path (if present)
+                if audio_gate.enabled {
+                    if let Some(sounds_res) = &critter_sounds {
+                        if let Some(set) = sounds_res.sounds.get(critter_id) {
+                            let entry_path = &set.entry;
+                            // Use relative paths for better compatibility
+                            let url = if entry_path.starts_with("http") { 
+                                entry_path.clone() 
+                            } else { 
+                                format!("/{}", entry_path.trim_start_matches('/'))
+                            };
+                            if let Ok(audio) = HtmlAudioElement::new_with_src(&url) {
+                                let _ = audio.play();
+                                console_log!("🔊 Entry sound playing (web): {}", url);
+                            }
+                        }
+                    }
+                }
+
                 game_state.current_critter_id = Some(critter_entity);
                 console_log!("🎭 Spawned {} at ({}, {})", critter_data.name, event.position.x, event.position.y);
                 }
@@ -709,3 +767,4 @@ pub fn window_resize_system(
         );
     }
 }
+

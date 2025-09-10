@@ -164,6 +164,7 @@ fn process_interaction_queue(
     mut interaction_events: EventWriter<game::CritterInteractionEvent>,
     window_query: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
+    mut audio_gate: ResMut<resources::AudioGate>,
 ) {
     if let Ok(mut queue) = INTERACTION_QUEUE.lock() {
         while let Some((interaction_type, screen_x, screen_y, _dir_x, _dir_y)) = queue.pop_front() {
@@ -184,6 +185,8 @@ fn process_interaction_queue(
                 screen_x, screen_y, world_pos.x, world_pos.y).into());
             
             // Find the closest critter to the click position  
+            // Unlock audio due to user gesture
+            audio_gate.enabled = true;
             for (entity, transform) in &critter_query {
                 let critter_pos = transform.translation.xy();
                 let critter_size = 100.0; // Larger clickable area radius for easier clicking

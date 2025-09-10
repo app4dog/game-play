@@ -12,6 +12,8 @@ pub struct AssetCollection {
     
     // Audio
     pub positive_sound: Handle<AudioSource>,
+    pub entry_sound: Handle<AudioSource>,
+    pub success_sound: Handle<AudioSource>,
     pub negative_sound: Handle<AudioSource>,
     
     // UI
@@ -59,6 +61,24 @@ impl CritterRegistry {
 
 // No Default implementation! Must be initialized with real critter data using from_ron()
 // This forces proper error handling instead of masking missing data with fallbacks
+
+#[derive(Debug, Clone)]
+pub struct CritterSoundSet {
+    pub entry: String,
+    pub success: String,
+}
+
+#[derive(Resource, Default)]
+pub struct CritterSounds {
+    pub sounds: HashMap<String, CritterSoundSet>, // critter_id -> sounds
+}
+
+/// Gate to ensure audio plays only after a user gesture (browser autoplay policy)
+#[derive(Resource, Default)]
+pub struct AudioGate {
+    pub enabled: bool,
+}
+
 
 #[derive(Debug, Clone)]
 pub struct CritterTemplate {
