@@ -133,6 +133,13 @@
             class="full-width q-mb-sm"
           />
           <q-btn
+            color="positive"
+            label="Play Test Sound"
+            size="md"
+            @click="playTestSound"
+            class="full-width q-mb-sm"
+          />
+          <q-btn
             color="secondary"
             label="Select Critter"
             size="md"
@@ -383,7 +390,7 @@ const playTestSound = async () => {
   console.error('Audio play failed for all candidates', { candidates, lastError })
   $q.notify({ type: 'negative', message: '❌ Failed to play any test sound', caption: describeError(lastError), position: 'top' })
 }
-
+ 
 const testBevyAudio = async () => {
   // Initialize AudioContext on first user interaction
   await gameCanvas.value?.initializeAudioContext()
@@ -411,7 +418,7 @@ const testBevyAudio = async () => {
     $q.notify({ type: 'negative', message: '❌ Failed to test Bevy audio', position: 'top' })
   }
 }
-
+ 
 const providedFile = 'assets/audio/1061796062_612948776_1752414215.mp3'
 
 const testBevyAudioProvided = async () => {
