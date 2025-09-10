@@ -214,27 +214,28 @@ const playTestSound = async () => {
   const candidates = [
     `${base}assets/audio/positive/yipee.mp3`,
     `${base}assets/audio/positive/yipee.ogg`,
-    // Public CORS-enabled fallback (MP3)
+    // Public sample MP3s known to work cross-origin
     'https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3',
+    'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
   ]
-  // Pick the first that responds OK to HEAD; otherwise use first
-  let url = candidates[0]!
-  for (const cand of candidates) {
+
+  let lastError: unknown = null
+  for (const url of candidates) {
     try {
-      const res = await fetch(cand, { method: 'HEAD' })
-      const ct = res.headers.get('content-type') || ''
-      if (res.ok && ct.toLowerCase().includes('audio')) { url = cand; break }
-    } catch { /* ignore */ }
+      const audio = new Audio()
+      audio.preload = 'auto'
+      audio.crossOrigin = 'anonymous'
+      audio.src = url
+      await audio.play()
+      $q.notify({ type: 'positive', message: `🔊 Playing: ${url}`, position: 'top' })
+      return
+    } catch (err) {
+      lastError = err
+      // try next candidate
+    }
   }
-  try {
-    const audio = new Audio(url)
-    audio.preload = 'auto'
-    await audio.play()
-    $q.notify({ type: 'positive', message: `🔊 Playing: ${url}`, position: 'top' })
-  } catch (err) {
-    console.error('Audio play failed', err)
-    $q.notify({ type: 'negative', message: '❌ Failed to play sound', caption: String(err), position: 'top' })
-  }
+  console.error('Audio play failed for all candidates', { candidates, lastError })
+  $q.notify({ type: 'negative', message: '❌ Failed to play any test sound', caption: String(lastError ?? 'Unknown error'), position: 'top' })
 }
 
 const startTrainingMode = () => {
