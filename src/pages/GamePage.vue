@@ -234,8 +234,14 @@ const playTestSound = async () => {
       // try next candidate
     }
   }
+  const describeError = (err: unknown): string => {
+    if (err instanceof Error) return `${err.name}: ${err.message}`
+    if (typeof err === 'string') return err
+    try { return JSON.stringify(err) } catch { /* ignore */ }
+    return 'Unknown error'
+  }
   console.error('Audio play failed for all candidates', { candidates, lastError })
-  $q.notify({ type: 'negative', message: '❌ Failed to play any test sound', caption: String(lastError ?? 'Unknown error'), position: 'top' })
+  $q.notify({ type: 'negative', message: '❌ Failed to play any test sound', caption: describeError(lastError), position: 'top' })
 }
 
 const startTrainingMode = () => {
