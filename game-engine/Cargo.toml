@@ -40,12 +40,15 @@ web-sys = { version = "0.3", features = [
     "HtmlCanvasElement",
     "HtmlAudioElement",
     "HtmlMediaElement",
+    "CustomEvent",
+    "CustomEventInit",
 ] }
 js-sys = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rand = "0.8"
 ron = "0.8"
+# specta removed - using manual type sync for simplicity
 wasm-bindgen-futures = "0.4"
 regex-lite = "0.1"
 # Local critter-keeper crate

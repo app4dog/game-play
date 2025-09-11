@@ -279,8 +279,8 @@ pub fn load_game_assets(
     asset_collection.bunny_sprite = asset_server.load("https://play.app4.dog:9000/assets/sprites/bunny-sprite-sheet.png");  
     console_log!("🐰 Bunny sprite handle created: {:?}", asset_collection.bunny_sprite);
     
-    // Load audio
-    asset_collection.positive_sound = asset_server.load("assets/audio/positive/yipee.mp3");
+    // Load audio (prefer existing OGG in repo)
+    asset_collection.positive_sound = asset_server.load("assets/audio/positive/yipee.ogg");
     
     console_log!("✅ Asset loading initiated with HTTPS URLs");
 }

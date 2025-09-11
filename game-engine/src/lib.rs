@@ -5,17 +5,23 @@ use web_sys::console;
 use std::sync::Mutex;
 use std::collections::VecDeque;
 
-mod game;
-mod systems;
+mod audio;
 mod components;
+mod events;
+mod game;
 mod resources;
+mod systems;
 
+use audio::{PlatformAudioPlugin, send_audio_response_to_bevy};
+use events::{EventBridgePlugin, BevyToJsEvent, send_js_to_bevy_event};
 use game::{GamePlugin, LoadCritterEvent, SpawnCritterEvent};
 use systems::process_click_on_critters;
 
 // Event queues for communication between WASM interface and Bevy
 static LOAD_CRITTER_QUEUE: Mutex<VecDeque<LoadCritterEvent>> = Mutex::new(VecDeque::new());
 static INTERACTION_QUEUE: Mutex<VecDeque<(String, f32, f32, f32, f32)>> = Mutex::new(VecDeque::new());
+static AUDIO_EVENT_QUEUE: Mutex<VecDeque<BevyToJsEvent>> = Mutex::new(VecDeque::new());
+static NATIVE_AUDIO_QUEUE: Mutex<VecDeque<audio::AudioRequest>> = Mutex::new(VecDeque::new());
 
 // Shared critter list snapshot for UI consumption
 #[derive(Clone, Debug)]
@@ -61,24 +67,30 @@ pub fn main() {
     
     App::new()
         .add_plugins(WebAssetPlugin::default())
-        .add_plugins(DefaultPlugins
-            .set(WindowPlugin {
-                primary_window: Some(Window {
-                    canvas: Some("#game-canvas".into()),
-                    fit_canvas_to_parent: true,
-                    prevent_default_event_handling: false,
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        canvas: Some("#game-canvas".into()),
+                        fit_canvas_to_parent: true,
+                        prevent_default_event_handling: false,
+                        ..default()
+                    }),
                     ..default()
-                }),
-                ..default()
-            })
-            .set(AssetPlugin {
-                meta_check: bevy::asset::AssetMetaCheck::Never,
-                ..default()
-            }))
+                })
+                .set(AssetPlugin {
+                    meta_check: bevy::asset::AssetMetaCheck::Never,
+                    ..default()
+                })
+        )
         .add_plugins(GamePlugin)
+        .add_plugins(EventBridgePlugin)
+        .add_plugins(PlatformAudioPlugin)
         .add_systems(Update, (
             process_load_critter_queue,
             process_interaction_queue,
+            process_audio_event_queue,
+            process_native_audio_queue,
         ))
         .run();
 }
@@ -174,6 +186,58 @@ impl GameEngine {
         console::log_1(&"🚪 Unloading current critter".into());
         // Future: cleanup current critter entity
     }
+
+    /// Test the new event bridge by playing audio via TypeScript
+    #[wasm_bindgen]
+    pub fn play_audio_via_bridge(&self, sound_id: &str, volume: f32) -> String {
+        let request_id = format!("audio-{}", js_sys::Date::now() as u64);
+        console::log_1(&format!("🎵 Requesting audio via bridge: {} (request_id: {})", sound_id, request_id).into());
+        
+        // We need to trigger this from within a Bevy system, so we'll use the same pattern as other events
+        if let Ok(mut queue) = AUDIO_EVENT_QUEUE.lock() {
+            queue.push_back(BevyToJsEvent::PlayAudio {
+                request_id: request_id.clone(),
+                sound_id: sound_id.to_string(),
+                volume,
+            });
+        }
+        
+        request_id
+    }
+
+    /// Play audio using the new b00t AudioPlugin pattern
+    #[wasm_bindgen]
+    pub fn play_audio_native(&self, sound_id: &str, volume: Option<f32>) -> String {
+        let request_id = audio::AudioManager::generate_request_id();
+        console::log_1(&format!("🎵 Playing audio via AudioPlugin: {} (request_id: {})", sound_id, request_id).into());
+        
+        // Queue audio request for the AudioPlugin to process
+        if let Ok(mut queue) = NATIVE_AUDIO_QUEUE.lock() {
+            queue.push_back(audio::AudioRequest::Play {
+                request_id: request_id.clone(),
+                sound_id: sound_id.to_string(),
+                context: audio::AudioContext::Test,
+                volume: volume.unwrap_or(0.8),
+                loop_audio: false,
+            });
+        }
+        
+        request_id
+    }
+    
+    /// Play enter area sound
+    #[wasm_bindgen]
+    pub fn play_enter_sound(&self) -> String {
+        console::log_1(&"🚪 Playing enter sound".into());
+        self.play_audio_native("enter_area", Some(0.8))
+    }
+    
+    /// Play exit area sound
+    #[wasm_bindgen]
+    pub fn play_exit_sound(&self) -> String {
+        console::log_1(&"🚪 Playing exit sound".into());
+        self.play_audio_native("exit_area", Some(0.7))
+    }
 }
 
 /// Free functions to allow UI to query available critters without holding a GameEngine instance
@@ -214,6 +278,18 @@ pub fn get_available_critters() -> js_sys::Array {
         }
     }
     arr
+}
+
+/// Expose the JS->Bevy event sending function 
+#[wasm_bindgen]
+pub fn send_event_to_bevy(event_json: &str) -> Result<(), JsValue> {
+    send_js_to_bevy_event(event_json)
+}
+
+/// Expose the audio response function from AudioPlugin
+#[wasm_bindgen]  
+pub fn send_audio_response(response_json: &str) -> Result<(), JsValue> {
+    send_audio_response_to_bevy(response_json)
 }
 
 // Systems to process the event queues from WASM interface
@@ -281,6 +357,28 @@ fn process_interaction_queue(
                     break; // Only interact with the first critter found
                 }
             }
+        }
+    }
+}
+
+// System to process audio events from WASM interface
+fn process_audio_event_queue(
+    mut bevy_to_js_events: EventWriter<BevyToJsEvent>,
+) {
+    if let Ok(mut queue) = AUDIO_EVENT_QUEUE.lock() {
+        while let Some(event) = queue.pop_front() {
+            bevy_to_js_events.write(event);
+        }
+    }
+}
+
+// System to process native audio requests from WASM interface
+fn process_native_audio_queue(
+    mut audio_requests: EventWriter<audio::AudioRequest>,
+) {
+    if let Ok(mut queue) = NATIVE_AUDIO_QUEUE.lock() {
+        while let Some(request) = queue.pop_front() {
+            audio_requests.write(request);
         }
     }
 }

@@ -28,9 +28,16 @@ fi
 # Post-process with wasm-opt for additional size reduction
 if command -v wasm-opt &> /dev/null; then
     echo "🗜️ Optimizing WASM with wasm-opt..."
-    wasm-opt -Oz ../public/wasm/app4dog_game_engine_bg.wasm -o ../public/wasm/app4dog_game_engine_bg.wasm
+    # Enable required WASM features for Bevy (using faster -O2 instead of -Oz for speed)
+    timeout 60s wasm-opt -O2 \
+        --enable-bulk-memory \
+        --enable-nontrapping-float-to-int \
+        --enable-sign-ext \
+        --enable-reference-types \
+        ../public/wasm/app4dog_game_engine_bg.wasm \
+        -o ../public/wasm/app4dog_game_engine_bg.wasm || echo "⚠️ wasm-opt timed out - WASM files are still functional"
 else
-    echo "⚠️ wasm-opt not found - install with: npm install -g binaryen"
+    echo "⚠️ wasm-opt not found - skipping optimization (install with: npm install -g binaryen)"
 fi
 
 # Files are automatically available via symlink: public/game-engine -> game-engine/pkg
