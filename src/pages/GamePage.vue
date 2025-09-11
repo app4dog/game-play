@@ -68,7 +68,6 @@
       </q-card-section>
 
       <q-separator inset />
-
       <!-- Bluetooth Debug Section -->
       <q-card-section>
         <div class="text-subtitle2 q-mb-sm">Bluetooth Controls</div>
@@ -80,7 +79,7 @@
       </q-card-section>
 
       <q-separator inset />
-
+ 
       <q-card-section>
         <div class="text-subtitle2 q-mb-sm">Audio Settings</div>
         <div class="row items-center q-gutter-sm">
@@ -139,6 +138,56 @@
             @click="playTestSound"
             class="full-width q-mb-sm"
           />
+          <q-btn
+            color="orange"
+            label="🎵 Test Bevy Audio Bridge"
+            size="md"
+            @click="testBevyAudio"
+            :disable="!eventBridgeReady"
+            class="full-width q-mb-sm"
+          />
+          <q-btn
+            color="orange-7"
+            label="🎵 Play Provided MP3 (bridge)"
+            size="sm"
+            @click="testBevyAudioProvided"
+            :disable="!eventBridgeReady"
+            class="full-width q-mb-sm"
+          />
+          <q-btn
+            color="purple"
+            label="🎶 Test Native Audio (b00t)"
+            size="md"
+            @click="testNativeAudio"
+            :disable="!nativeAudioReady"
+            class="full-width q-mb-sm"
+          />
+          <q-btn
+            color="purple-7"
+            label="🎶 Play Provided MP3 (native)"
+            size="sm"
+            @click="testNativeAudioProvided"
+            :disable="!nativeAudioReady"
+            class="full-width q-mb-sm"
+          />
+          <div class="row q-gutter-sm q-mb-sm">
+            <q-btn
+              color="green"
+              label="🚪 Enter Sound"
+              size="sm"
+              @click="playEnterSound"
+              :disable="!nativeAudioReady"
+              class="col"
+            />
+            <q-btn
+              color="red"
+              label="🚪 Exit Sound"
+              size="sm"
+              @click="playExitSound"
+              :disable="!nativeAudioReady"
+              class="col"
+            />
+          </div>
           <q-btn
             color="secondary"
             label="Select Critter"
@@ -387,7 +436,6 @@ const playTestSound = async () => {
     try { return JSON.stringify(err) } catch { /* ignore */ }
     return 'Unknown error'
   }
-<<<<<<< HEAD
   console.error('Audio play failed for all candidates', { candidates, lastError })
   $q.notify({ type: 'negative', message: '❌ Failed to play any test sound', caption: describeError(lastError), position: 'top' })
 }
@@ -427,12 +475,6 @@ const testBevyAudioProvided = async () => {
   if (!gameCanvas.value) {
     $q.notify({ type: 'warning', message: '❌ Game engine not ready', position: 'top' })
     return
-=======
-      const res = await fetch(cand, { method: 'HEAD' })
-      const ct = res.headers.get('content-type') || ''
-      if (res.ok && ct.toLowerCase().includes('audio')) { url = cand; break }
-    } catch { /* ignore */ }
->>>>>>> 55a3b8e (Audio: Improve Play Test Sound button with content-type check and CORS-enabled MP3 fallback)
   }
   try {
     const gameEngine = gameCanvas.value.getGameEngine()
@@ -621,6 +663,154 @@ const testVirtualCollar = async () => {
   $q.notify({ type: 'negative', message: '❌ Failed to play any test sound', caption: describeError(lastError), position: 'top' })
 }
 
+const testBevyAudio = async () => {
+  // Initialize AudioContext on first user interaction
+  await gameCanvas.value?.initializeAudioContext()
+  if (!gameCanvas.value) {
+    $q.notify({ type: 'warning', message: '❌ Game engine not ready', position: 'top' })
+    return
+  }
+
+  try {
+    // Call the WASM function to trigger audio via the event bridge
+    const gameEngine = gameCanvas.value.getGameEngine()
+    if (gameEngine && typeof gameEngine.play_audio_via_bridge === 'function') {
+      const requestId = gameEngine.play_audio_via_bridge('yipee', 0.8)
+      $q.notify({ 
+        type: 'info', 
+        message: `🎵 Audio request sent via Bevy bridge (${requestId})`, 
+        position: 'top',
+        timeout: 2000
+      })
+    } else {
+      $q.notify({ type: 'warning', message: '❌ Bevy audio bridge not available', position: 'top' })
+    }
+  } catch (error) {
+    console.error('Failed to test Bevy audio:', error)
+    $q.notify({ type: 'negative', message: '❌ Failed to test Bevy audio', position: 'top' })
+  }
+}
+
+const providedFile = 'assets/audio/1061796062_612948776_1752414215.mp3'
+
+const testBevyAudioProvided = async () => {
+  await gameCanvas.value?.initializeAudioContext()
+  if (!gameCanvas.value) {
+    $q.notify({ type: 'warning', message: '❌ Game engine not ready', position: 'top' })
+    return
+  }
+  try {
+    const gameEngine = gameCanvas.value.getGameEngine()
+    if (gameEngine && typeof gameEngine.play_audio_via_bridge === 'function') {
+      const requestId = gameEngine.play_audio_via_bridge(providedFile, 0.8)
+      $q.notify({ type: 'info', message: `🎵 Bridge: playing ${providedFile} (${requestId})`, position: 'top', timeout: 2000 })
+    }
+  } catch (e) {
+    console.error('Failed to test provided bridge audio:', e)
+    $q.notify({ type: 'negative', message: '❌ Bridge audio failed', position: 'top' })
+  }
+}
+
+const testNativeAudio = async () => {
+  // Initialize AudioContext on first user interaction
+  await gameCanvas.value?.initializeAudioContext()
+  if (!gameCanvas.value) {
+    $q.notify({ type: 'warning', message: '❌ Game engine not ready', position: 'top' })
+    return
+  }
+
+  try {
+    // Call the WASM function to trigger native audio via AudioPlugin
+    const gameEngine = gameCanvas.value.getGameEngine()
+    if (gameEngine && typeof gameEngine.play_audio_native === 'function') {
+      const requestId = gameEngine.play_audio_native('yipee', 0.8)
+      $q.notify({ 
+        type: 'info', 
+        message: `🎶 Native audio request sent (${requestId})`, 
+        position: 'top',
+        timeout: 2000
+      })
+    } else {
+      $q.notify({ type: 'warning', message: '❌ Native audio not available', position: 'top' })
+    }
+  } catch (error) {
+    console.error('Failed to test native audio:', error)
+    $q.notify({ type: 'negative', message: '❌ Failed to test native audio', position: 'top' })
+  }
+}
+
+const testNativeAudioProvided = async () => {
+  await gameCanvas.value?.initializeAudioContext()
+  if (!gameCanvas.value) {
+    $q.notify({ type: 'warning', message: '❌ Game engine not ready', position: 'top' })
+    return
+  }
+  try {
+    const gameEngine = gameCanvas.value.getGameEngine()
+    if (gameEngine && typeof gameEngine.play_audio_native === 'function') {
+      const requestId = gameEngine.play_audio_native(providedFile, 0.8)
+      $q.notify({ type: 'info', message: `🎶 Native: playing ${providedFile} (${requestId})`, position: 'top', timeout: 2000 })
+    }
+  } catch (e) {
+    console.error('Failed to test provided native audio:', e)
+    $q.notify({ type: 'negative', message: '❌ Native audio failed', position: 'top' })
+  }
+}
+
+const playEnterSound = async () => {
+  // Initialize AudioContext on first user interaction
+  await gameCanvas.value?.initializeAudioContext()
+  if (!gameCanvas.value) {
+    $q.notify({ type: 'warning', message: '❌ Game engine not ready', position: 'top' })
+    return
+  }
+
+  try {
+    const gameEngine = gameCanvas.value.getGameEngine()
+    if (gameEngine && typeof gameEngine.play_enter_sound === 'function') {
+      const requestId = gameEngine.play_enter_sound()
+      $q.notify({ 
+        type: 'positive', 
+        message: `🚪 Enter sound playing (${requestId})`, 
+        position: 'top',
+        timeout: 1500
+      })
+    } else {
+      $q.notify({ type: 'warning', message: '❌ Enter sound not available', position: 'top' })
+    }
+  } catch (error) {
+    console.error('Failed to play enter sound:', error)
+    $q.notify({ type: 'negative', message: '❌ Failed to play enter sound', position: 'top' })
+  }
+}
+
+const playExitSound = async () => {
+  // Initialize AudioContext on first user interaction
+  await gameCanvas.value?.initializeAudioContext()
+  if (!gameCanvas.value) {
+    $q.notify({ type: 'warning', message: '❌ Game engine not ready', position: 'top' })
+    return
+  }
+
+  try {
+    const gameEngine = gameCanvas.value.getGameEngine()
+    if (gameEngine && typeof gameEngine.play_exit_sound === 'function') {
+      const requestId = gameEngine.play_exit_sound()
+      $q.notify({ 
+        type: 'positive', 
+        message: `🚪 Exit sound playing (${requestId})`, 
+        position: 'top',
+        timeout: 1500
+      })
+    } else {
+      $q.notify({ type: 'warning', message: '❌ Exit sound not available', position: 'top' })
+    }
+  } catch (error) {
+    console.error('Failed to play exit sound:', error)
+    $q.notify({ type: 'negative', message: '❌ Failed to play exit sound', position: 'top' })
+  }
+}
+
 const startTrainingMode = () => {
   showMenu.value = false
   // Future: start vocabulary training mode
@@ -779,6 +969,7 @@ onMounted(() => {
   left: 8px;
   z-index: 1000;
 }
+<<<<<<< HEAD
 
 .bluetooth-dialog .q-dialog__inner {
   padding: 0 !important;
@@ -788,4 +979,6 @@ onMounted(() => {
   margin: 0 !important;
   max-width: 100vw !important;
 }
+=======
+>>>>>>> c63dbf2 (audio!)
 </style>

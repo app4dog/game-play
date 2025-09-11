@@ -28,33 +28,6 @@ static NATIVE_AUDIO_QUEUE: Mutex<VecDeque<audio::AudioRequest>> = Mutex::new(Vec
 static BLUETOOTH_REQUEST_QUEUE: Mutex<VecDeque<BluetoothRequest>> = Mutex::new(VecDeque::new());
 static BLUETOOTH_RESPONSE_QUEUE: Mutex<VecDeque<BluetoothResponse>> = Mutex::new(VecDeque::new());
 
-// Shared critter list snapshot for UI consumption
-#[derive(Clone, Debug)]
-pub struct CritterSummary {
-    pub id: String,
-    pub name: String,
-    pub species: String,
-    pub sprite_url: String,
-    // Preview/animation metadata (idle)
-    pub frame_width: f32,
-    pub frame_height: f32,
-    pub idle_fps: f32,
-    pub idle_frame_coords: Vec<(f32, f32)>, // ordered list of (x,y) for idle frames
-    // Raw critter stats for display
-    pub stat_base_speed: f32,
-    pub stat_energy: f32,
-    pub stat_happiness_boost: f32,
-}
-
-static CRITTER_LIST: Mutex<Vec<CritterSummary>> = Mutex::new(Vec::new());
-static CRITTERS_READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
-pub(crate) fn set_available_critters(list: Vec<CritterSummary>) {
-    if let Ok(mut g) = CRITTER_LIST.lock() {
-        *g = list;
-        CRITTERS_READY.store(true, std::sync::atomic::Ordering::SeqCst);
-    }
-}
 
 // Shared critter list snapshot for UI consumption
 #[derive(Clone, Debug)]
@@ -276,7 +249,7 @@ impl GameEngine {
         console::log_1(&"🚪 Playing exit sound".into());
         self.play_audio_native("exit_area", Some(0.7))
     }
-
+ 
     /// Start Bluetooth device scan
     #[wasm_bindgen]
     pub fn start_bluetooth_scan(&self, duration_ms: Option<u32>) -> String {
@@ -492,6 +465,18 @@ pub fn get_available_critters() -> js_sys::Array {
         }
     }
     arr
+}
+
+/// Expose the JS->Bevy event sending function 
+#[wasm_bindgen]
+pub fn send_event_to_bevy(event_json: &str) -> Result<(), JsValue> {
+    send_js_to_bevy_event(event_json)
+}
+
+/// Expose the audio response function from AudioPlugin
+#[wasm_bindgen]  
+pub fn send_audio_response(response_json: &str) -> Result<(), JsValue> {
+    send_audio_response_to_bevy(response_json)
 }
 
 // Systems to process the event queues from WASM interface

@@ -183,12 +183,19 @@ pub fn handle_js_to_bevy_events(
                 // This will be handled by the audio system
             }
             JsToBevyEvent::SettingsUpdated { request_id, settings } => {
+<<<<<<< HEAD
                 // Update settings resource but FORCE music_enabled to false
                 let mut updated_settings = settings.clone();
                 updated_settings.music_enabled = false; // TODO: Temporarily force music off
                 *shared_settings = updated_settings;
                 console_log!(
                     "⚙️ Settings updated ({}): music_enabled={} (FORCED OFF), bgm_volume={}, sfx_volume={}",
+=======
+                // Update settings resource
+                *shared_settings = settings.clone();
+                console_log!(
+                    "⚙️ Settings updated ({}): music_enabled={}, bgm_volume={}, sfx_volume={}",
+>>>>>>> c63dbf2 (audio!)
                     request_id,
                     shared_settings.music_enabled,
                     shared_settings.bgm_volume,
@@ -278,7 +285,11 @@ pub struct SharedSettings {
 impl Default for SharedSettings {
     fn default() -> Self {
         Self {
+<<<<<<< HEAD
             music_enabled: false, // TODO: Temporarily disabled - was: true
+=======
+            music_enabled: true,
+>>>>>>> c63dbf2 (audio!)
             bgm_volume: 0.6,
             sfx_volume: 0.8,
         }
