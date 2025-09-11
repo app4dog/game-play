@@ -32,23 +32,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import type { Ref } from 'vue'
+// Unified WASM types are now globally declared
 // Type-only import mapped by src/types/game-engine.d.ts
-// Local type declarations to avoid relying on TS module resolution for public/ assets
-type WasmInit = (
-  input?: RequestInfo | URL | Response | BufferSource | WebAssembly.Module
-) => Promise<void>
 
-interface GameEngineApi {
-  start_game(): void
-  pause_game(): void
-  reset_game(): void
-  handle_interaction?(type: string, x: number, y: number, dir_x: number, dir_y: number): void
-  load_critter?(critter_id: number, name: string, species: string): void
-  load_critter_by_id?(id: string): void
-  get_critter_info?(): { id: number; name: string; species: string; happiness: number; energy: number }
-  unload_critter?(): void
-  free?(): void
-}
+// GameEngineApi now imported from unified types
 
 interface GameState {
   score: number
@@ -61,10 +48,52 @@ const emit = defineEmits<{
   gameReady: []
   gameError: [error: string]
   scoreChanged: [score: number]
+  audioReady: []
 }>()
 
 // Expose game engine for other components
 const getGameEngine = () => gameEngine
+
+// Audio context management for browser autoplay policy
+const audioContextInitialized = ref(false)
+let webAudioCtx: AudioContext | null = null
+let bgmSource: AudioBufferSourceNode | null = null
+let bgmGain: GainNode | null = null
+
+// Function to initialize AudioContext after user gesture
+const initializeAudioContext = () => {
+  if (audioContextInitialized.value || !wasmModule) return Promise.resolve()
+  
+  return new Promise<void>((resolve) => {
+    try {
+      // Create or resume a Web Audio context for gapless BGM
+      const Ctx = window.AudioContext || window.webkitAudioContext
+      if (Ctx && !webAudioCtx) {
+        webAudioCtx = new Ctx()
+      }
+      try { void webAudioCtx?.resume?.() } catch { /* ignore */ }
+      // Check if the WASM module has an audio context resume function
+      const wasm = window.__A4D_WASM__
+      if (wasm?.send_js_to_bevy_event) {
+        // Send a user gesture event to Bevy to initialize AudioContext
+        const userGestureEvent = {
+          type: 'UserGesture',
+          request_id: `user-gesture-${Date.now()}`,
+          timestamp: Date.now()
+        }
+        wasm.send_js_to_bevy_event(JSON.stringify(userGestureEvent))
+      }
+      
+      audioContextInitialized.value = true
+      console.log('🎵 AudioContext initialized after user gesture')
+      emit('audioReady')
+      resolve()
+    } catch (error) {
+      console.warn('⚠️ Failed to initialize AudioContext:', error)
+      resolve() // Don't reject, just log and continue
+    }
+  })
+}
 
 // Export for parent component access (consolidated)
 
@@ -113,13 +142,8 @@ const spriteLoadInfo = ref<{ total: number; loaded: number; failed: string[] }>(
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 let _rafIdLocal: number | null = null
 
-type WasmModule = {
-  default: WasmInit
-  GameEngine: new () => GameEngineApi
-}
-
 let gameEngine: GameEngineApi | null = null
-let wasmModule: WasmModule | null = null
+let wasmModule: UnifiedWasmModule | null = null
 
 // Touch/mouse interaction state
 let isInteracting = false
@@ -168,7 +192,7 @@ onMounted(async () => {
     moduleUrl = selected.jsUrl
 
     // Obtain the module exports
-    let mod = (window as Window & { __A4D_WASM__?: WasmModule }).__A4D_WASM__
+    let mod = window.__A4D_WASM__
     if (!mod) {
       // Dynamically inject a module script that imports and exposes the glue
       console.debug('[A4D][WASM] injecting module script for glue')
@@ -177,10 +201,10 @@ onMounted(async () => {
       script.textContent = `import * as m from '${moduleUrl}'; window.__A4D_WASM__ = m;`
       document.head.appendChild(script)
       // Wait briefly for the module to load
-      mod = await new Promise<WasmModule | undefined>((resolve) => {
+      mod = await new Promise<UnifiedWasmModule | undefined>((resolve) => {
         const start = performance.now()
         const check = () => {
-          const m = (window as Window & { __A4D_WASM__?: WasmModule }).__A4D_WASM__
+          const m = window.__A4D_WASM__
           if (m) resolve(m)
           else if (performance.now() - start > 3000) resolve(undefined)
           else setTimeout(check, 50)
@@ -197,10 +221,14 @@ onMounted(async () => {
     }
     wasmModule = mod
     console.debug('[A4D][WASM] initializing module default()')
-    await wasmModule.default() // Initialize WASM
-    console.debug('[A4D][WASM] module initialized')
-    
-    gameEngine = new wasmModule.GameEngine()
+    if (wasmModule) {
+      await wasmModule.default() // Initialize WASM
+      console.debug('[A4D][WASM] module initialized')
+      
+      gameEngine = new wasmModule.GameEngine()
+    } else {
+      throw new Error('WASM module not available')
+    }
     gameEngine.start_game()
     
     // Set up canvas
@@ -229,10 +257,13 @@ onUnmounted(() => {
 })
 
 // Touch handling for pet interactions
-const handleTouch = (event: TouchEvent) => {
+const handleTouch = async (event: TouchEvent) => {
   event.preventDefault()
   const touch = event.touches[0]!
   const rect = (event.target as HTMLElement).getBoundingClientRect()
+  
+  // Initialize AudioContext on first user gesture
+  await initializeAudioContext()
   
   isInteracting = true
   lastInteractionPos = {
@@ -271,8 +302,11 @@ const handleTouchEnd = () => {
 }
 
 // Mouse handling (for testing on desktop)
-const handleMouse = (event: MouseEvent) => {
+const handleMouse = async (event: MouseEvent) => {
   const rect = (event.target as HTMLElement).getBoundingClientRect()
+  
+  // Initialize AudioContext on first user gesture
+  await initializeAudioContext()
   
   isInteracting = true
   lastInteractionPos = {
@@ -353,6 +387,61 @@ defineExpose({
   pauseGame,
   resumeGame,
   resetGame: () => gameEngine?.reset_game?.(),
+  
+  // Audio context initialization for user gesture compliance
+  initializeAudioContext,
+  // Background music controls (Web Audio; no-op if unavailable)
+  startBackgroundMusic: async (url?: string): Promise<boolean> => {
+    // Global kill-switch
+    if (window.__A4D_DISABLE_BGM__ === true) {
+      console.warn('BGM globally disabled via __A4D_DISABLE_BGM__')
+      return false
+    }
+    // Ensure audio context is ready
+    await initializeAudioContext()
+    const ctx = webAudioCtx
+    if (!ctx) { console.warn('No WebAudio context; skipping BGM'); return false }
+
+    // Stop existing
+    if (bgmSource) { try { bgmSource.stop(0) } catch { /* ignore */ } bgmSource.disconnect(); bgmSource = null }
+    if (!bgmGain) { bgmGain = ctx.createGain(); bgmGain.gain.value = 0.5; bgmGain.connect(ctx.destination) }
+
+    // Choose candidate URL
+    const base = import.meta.env.BASE_URL
+    const candidates = [
+      url,
+      `${base}assets/audio/bgm/theme.mp3`,
+      `${base}assets/audio/positive/yipee.ogg`, // fallback short loop
+    ].filter(Boolean) as string[]
+
+    for (const cand of candidates) {
+      try {
+        const res = await fetch(cand, { mode: 'cors' })
+        if (!res.ok) continue
+        const buf = await res.arrayBuffer()
+        const audioBuffer = await ctx.decodeAudioData(buf.slice(0))
+        const src = ctx.createBufferSource()
+        src.buffer = audioBuffer
+        src.loop = true
+        if (!bgmGain) { bgmGain = ctx.createGain(); bgmGain.gain.value = 0.5; bgmGain.connect(ctx.destination) }
+        if (bgmGain) src.connect(bgmGain)
+        src.start(0)
+        bgmSource = src
+        console.log('🎼 BGM started:', cand)
+        return true
+      } catch (e) {
+        console.warn('BGM candidate failed:', cand, e)
+      }
+    }
+    console.warn('No BGM candidates playable')
+    return false
+  },
+  stopBackgroundMusic: () => {
+    if (bgmSource) { try { bgmSource.stop(0) } catch { /* ignore */ } bgmSource.disconnect(); bgmSource = null }
+  },
+  setBackgroundMusicVolume: (v: number) => {
+    if (bgmGain) bgmGain.gain.value = Math.max(0, Math.min(1, v))
+  },
   
   // Game engine access methods
   getGameEngine,
