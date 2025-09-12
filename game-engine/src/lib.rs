@@ -28,7 +28,6 @@ static NATIVE_AUDIO_QUEUE: Mutex<VecDeque<audio::AudioRequest>> = Mutex::new(Vec
 static BLUETOOTH_REQUEST_QUEUE: Mutex<VecDeque<BluetoothRequest>> = Mutex::new(VecDeque::new());
 static BLUETOOTH_RESPONSE_QUEUE: Mutex<VecDeque<BluetoothResponse>> = Mutex::new(VecDeque::new());
 
-
 // Shared critter list snapshot for UI consumption
 #[derive(Clone, Debug)]
 pub struct CritterSummary {
@@ -93,10 +92,8 @@ pub fn main() {
         .add_plugins(GamePlugin)
         .add_plugins(EventBridgePlugin)
         .add_plugins(PlatformAudioPlugin)
-<<<<<<< HEAD
         .add_plugins(BluetoothPlugin)
-=======
->>>>>>> 0db225b (pausing on ribbons)
+        .add_plugins(BluetoothPlugin)
         .add_plugins(effects::ExplosionEffectsPlugin)
         .add_systems(Update, (
             process_load_critter_queue,
@@ -376,6 +373,7 @@ impl GameEngine {
         
         status
     }
+<<<<<<< HEAD
 }
 
 /// Free functions to allow UI to query available critters without holding a GameEngine instance
@@ -428,6 +426,8 @@ pub fn send_event_to_bevy(event_json: &str) -> Result<(), JsValue> {
 #[wasm_bindgen]  
 pub fn send_audio_response(response_json: &str) -> Result<(), JsValue> {
     send_audio_response_to_bevy(response_json)
+=======
+>>>>>>> fe819d4 (feat: basic bluetooth menu)
 }
 
 /// Free functions to allow UI to query available critters without holding a GameEngine instance
