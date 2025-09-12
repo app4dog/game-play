@@ -132,63 +132,6 @@
             class="full-width q-mb-sm"
           />
           <q-btn
-            color="positive"
-            label="Play Test Sound"
-            size="md"
-            @click="playTestSound"
-            class="full-width q-mb-sm"
-          />
-          <q-btn
-            color="orange"
-            label="🎵 Test Bevy Audio Bridge"
-            size="md"
-            @click="testBevyAudio"
-            :disable="!eventBridgeReady"
-            class="full-width q-mb-sm"
-          />
-          <q-btn
-            color="orange-7"
-            label="🎵 Play Provided MP3 (bridge)"
-            size="sm"
-            @click="testBevyAudioProvided"
-            :disable="!eventBridgeReady"
-            class="full-width q-mb-sm"
-          />
-          <q-btn
-            color="purple"
-            label="🎶 Test Native Audio (b00t)"
-            size="md"
-            @click="testNativeAudio"
-            :disable="!nativeAudioReady"
-            class="full-width q-mb-sm"
-          />
-          <q-btn
-            color="purple-7"
-            label="🎶 Play Provided MP3 (native)"
-            size="sm"
-            @click="testNativeAudioProvided"
-            :disable="!nativeAudioReady"
-            class="full-width q-mb-sm"
-          />
-          <div class="row q-gutter-sm q-mb-sm">
-            <q-btn
-              color="green"
-              label="🚪 Enter Sound"
-              size="sm"
-              @click="playEnterSound"
-              :disable="!nativeAudioReady"
-              class="col"
-            />
-            <q-btn
-              color="red"
-              label="🚪 Exit Sound"
-              size="sm"
-              @click="playExitSound"
-              :disable="!nativeAudioReady"
-              class="col"
-            />
-          </div>
-          <q-btn
             color="secondary"
             label="Select Critter"
             size="md"

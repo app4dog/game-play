@@ -93,7 +93,10 @@ pub fn main() {
         .add_plugins(GamePlugin)
         .add_plugins(EventBridgePlugin)
         .add_plugins(PlatformAudioPlugin)
+<<<<<<< HEAD
         .add_plugins(BluetoothPlugin)
+=======
+>>>>>>> 0db225b (pausing on ribbons)
         .add_plugins(effects::ExplosionEffectsPlugin)
         .add_systems(Update, (
             process_load_critter_queue,

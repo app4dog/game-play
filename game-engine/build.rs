@@ -2,6 +2,8 @@
 // For now, we'll keep it simple and manually create the TypeScript types
 // TODO: Integrate specta type export in a future iteration
 
+use std::process::Command;
+
 fn main() {
     println!("cargo:rerun-if-changed=src/events.rs");
     println!("cargo:warning=TypeScript types should be manually synced for now");
