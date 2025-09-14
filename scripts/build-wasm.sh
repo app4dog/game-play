@@ -8,6 +8,17 @@ MODE=${WASM_MODE:-dev}
 
 echo "🦀 Building App4.Dog Game Engine (Rust -> WASM) [${MODE} mode]"
 
+# Verbose diagnostics for CI
+echo "🔎 Tool versions:"
+set +e
+rustc --version || true
+cargo --version || true
+wasm-pack --version || ~/.cargo/bin/wasm-pack --version || true
+echo "RUSTFLAGS=$RUSTFLAGS"
+set -e
+
+export RUST_BACKTRACE=1
+
 # Load Rust environment
 . ~/.cargo/env 2>/dev/null || true
 
@@ -48,28 +59,28 @@ if [ "$HAS_WASM_PACK" = "1" ]; then
     set +e
     if command -v wasm-pack &> /dev/null; then
         # Output to src/types for TS consumption AND ensure public assets for CI/artifacts
-        wasm-pack build --target web --out-dir ../src/types/wasm $BUILD_FLAGS
+        wasm-pack build -vv --target web --out-dir ../src/types/wasm $BUILD_FLAGS
     else
         # Output to src/types for TS consumption AND ensure public assets for CI/artifacts
-        ~/.cargo/bin/wasm-pack build --target web --out-dir ../src/types/wasm $BUILD_FLAGS
+        ~/.cargo/bin/wasm-pack build -vv --target web --out-dir ../src/types/wasm $BUILD_FLAGS
     fi
     STATUS=$?
     set -e
     if [ $STATUS -ne 0 ]; then
         echo "⚠️ wasm-pack failed (likely missing wasm-bindgen or perms). Falling back to cargo build."
         if [ "$MODE" = "release" ]; then
-            cargo build --no-default-features --lib --target wasm32-unknown-unknown --release
+            cargo build -vv --no-default-features --lib --target wasm32-unknown-unknown --release
         else
-            cargo build --no-default-features --lib --target wasm32-unknown-unknown
+            cargo build -vv --no-default-features --lib --target wasm32-unknown-unknown
         fi
         echo "ℹ️ wasm-bindgen/JS glue not generated (install wasm-bindgen and rerun wasm-pack)."
     fi
 else
     echo "🔧 Running plain cargo build for wasm32-unknown-unknown (no packaging)"
     if [ "$MODE" = "release" ]; then
-        cargo build --no-default-features --lib --target wasm32-unknown-unknown --release
+        cargo build -vv --no-default-features --lib --target wasm32-unknown-unknown --release
     else
-        cargo build --no-default-features --lib --target wasm32-unknown-unknown
+        cargo build -vv --no-default-features --lib --target wasm32-unknown-unknown
     fi
     echo "ℹ️ wasm-bindgen/JS glue not generated (install wasm-pack to package for web)."
 fi
