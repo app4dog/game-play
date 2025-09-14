@@ -23,4 +23,5 @@ export interface BluetoothStatus {
   connectedDevices: number
   discoveredDevices: number
   virtualNetworkEnabled: boolean
+  errorCounts?: Record<string, number> // Optional property for fallback return value
 }
