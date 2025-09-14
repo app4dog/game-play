@@ -210,11 +210,26 @@ pub fn update_camera_preview_system(
     preview_entity: Option<Res<CameraPreviewEntity>>,
     mut q_transform: Query<&mut Transform>,
     mut q_sprite: Query<&mut Sprite>,
+    mut q_visibility: Query<&mut Visibility>,
     ctrl: Option<Res<CameraPreviewControl>>,
     windows: Query<&Window>,
 ) {
     let Some(handle) = handle else { return; };
     let Some(preview_entity) = preview_entity else { return; };
+    
+    // Check if preview is enabled
+    let enabled = ctrl.as_ref().map(|c| c.enabled).unwrap_or(true);
+    
+    // Update visibility based on enabled state
+    if let Ok(mut vis) = q_visibility.get_mut(preview_entity.0) {
+        *vis = if enabled { Visibility::Visible } else { Visibility::Hidden };
+    }
+    
+    // Only process frame updates if enabled
+    if !enabled {
+        return;
+    }
+    
     let anchor = ctrl.as_ref().map(|c| c.anchor.clone()).unwrap_or(PreviewAnchor::TopRight);
     let margin = ctrl.as_ref().map(|c| c.margin).unwrap_or(12.0);
     let offx = ctrl.as_ref().map(|c| c.offset_x).unwrap_or(0.0);
