@@ -1,0 +1,12 @@
+# ⚠️ Auto-generated WASM files - DO NOT COMMIT
+# These are copies from src/types/wasm/ - source of truth is Rust code
+# Auto-copied via Vite plugin in quasar.config.ts
+#
+# To modify WASM functionality:
+# 1. Edit Rust source in game-engine/src/
+# 2. Run 'just build-wasm'
+# 3. Files will be auto-copied here during build
+
+*.js
+*.wasm
+*.d.ts

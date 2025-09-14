@@ -230,6 +230,10 @@ onMounted(async () => {
     } else {
       throw new Error('WASM module not available')
     }
+    
+    if (!gameEngine) {
+      throw new Error('Game engine not initialized')
+    }
     gameEngine.start_game()
     
     // Set up canvas
