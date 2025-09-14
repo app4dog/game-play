@@ -46,6 +46,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install
         
+      - name: Build critter-keeper WASM (external)
+        env:
+          CRITTER_KEEPER_REPO: https://github.com/app4dog/critter-keeper
+        run: |
+          set -e
+          echo "📦 Cloning critter-keeper from ${CRITTER_KEEPER_REPO}"
+          mkdir -p extern
+          git clone --depth 1 "$CRITTER_KEEPER_REPO" extern/critter-keeper
+          cd extern/critter-keeper
+          echo "🔧 Building critter-keeper to src/types/critter-keeper (web target)"
+          ~/.cargo/bin/wasm-pack build --target web --out-dir ../../src/types/critter-keeper --release
+          echo "✅ critter-keeper WASM built"
+          cd -
+
       - name: Build WASM
         run: just build-wasm
         
