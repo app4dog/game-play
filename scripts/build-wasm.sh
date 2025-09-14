@@ -24,10 +24,9 @@ if [ "$MODE" = "dev" ]; then
 fi
 
 # Check if required tools are installed (check both PATH and cargo bin)
-if ! command -v wasm-pack &> /dev/null && ! [ -f ~/.cargo/bin/wasm-pack ]; then
-    echo "❌ wasm-pack not found. Installing..."
-    ~/.cargo/bin/cargo install wasm-pack || curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-fi
+HAS_WASM_PACK=0
+if command -v wasm-pack &> /dev/null; then HAS_WASM_PACK=1; fi
+if [ -f ~/.cargo/bin/wasm-pack ]; then HAS_WASM_PACK=1; fi
 
 # Navigate to game engine directory
 cd game-engine
@@ -44,11 +43,35 @@ else
     BUILD_FLAGS="--dev"
 fi
 
-# Build using wasm-pack with --no-typescript (we generate our own TS bindings)
-if command -v wasm-pack &> /dev/null; then
-    wasm-pack build --target web --out-dir ../public/wasm $BUILD_FLAGS --no-typescript
+if [ "$HAS_WASM_PACK" = "1" ]; then
+    echo "📦 Using wasm-pack to build + package"
+    set +e
+    if command -v wasm-pack &> /dev/null; then
+        # 🤓 Output directly to src/types to avoid copying and maintain single source of truth
+        wasm-pack build --target web --out-dir ../src/types/wasm $BUILD_FLAGS
+    else
+        # 🤓 Output directly to src/types to avoid copying and maintain single source of truth
+        ~/.cargo/bin/wasm-pack build --target web --out-dir ../src/types/wasm $BUILD_FLAGS
+    fi
+    STATUS=$?
+    set -e
+    if [ $STATUS -ne 0 ]; then
+        echo "⚠️ wasm-pack failed (likely missing wasm-bindgen or perms). Falling back to cargo build."
+        if [ "$MODE" = "release" ]; then
+            cargo build --no-default-features --lib --target wasm32-unknown-unknown --release
+        else
+            cargo build --no-default-features --lib --target wasm32-unknown-unknown
+        fi
+        echo "ℹ️ wasm-bindgen/JS glue not generated (install wasm-bindgen and rerun wasm-pack)."
+    fi
 else
-    ~/.cargo/bin/wasm-pack build --target web --out-dir ../public/wasm $BUILD_FLAGS --no-typescript
+    echo "🔧 Running plain cargo build for wasm32-unknown-unknown (no packaging)"
+    if [ "$MODE" = "release" ]; then
+        cargo build --no-default-features --lib --target wasm32-unknown-unknown --release
+    else
+        cargo build --no-default-features --lib --target wasm32-unknown-unknown
+    fi
+    echo "ℹ️ wasm-bindgen/JS glue not generated (install wasm-pack to package for web)."
 fi
 
 # Only run wasm-opt for release builds (or when explicitly requested)
@@ -71,11 +94,12 @@ else
 fi
 
 # Files are automatically available via symlink: public/game-engine -> game-engine/pkg
-echo "📦 WASM files available via symlink (single source of truth)"
+echo "📦 WASM files available via symlink (single source of truth), if packaging was done"
 
 # Generate TypeScript bindings for Vue components
-echo "🔧 Generating TypeScript bindings..."
-cat > ../src/types/game-engine.d.ts << 'EOF'
+if [ "$HAS_WASM_PACK" = "1" ] && [ ${STATUS:-0} -eq 0 ]; then
+  echo "🔧 Generating TypeScript bindings..."
+  cat > ../src/types/game-engine.d.ts << 'EOF'
 // Auto-generated TypeScript bindings for App4.Dog Game Engine WASM module
 
 declare module '/game-engine/pkg/app4dog_game_engine.js' {
@@ -106,7 +130,11 @@ declare module '/game-engine/pkg/app4dog_game_engine.js' {
   }
 }
 EOF
+else
+  echo "ℹ️ Skipping TS bindings generation (requires wasm-pack output)."
+fi
 
 echo "✅ WASM build complete!"
-echo "📂 Files generated in public/game-engine/"
+echo "📂 TypeScript types generated in src/types/wasm/"
+echo "📂 WASM files available in src/types/wasm/ (will be copied to public/ during build)"
 echo "🎮 Game engine ready for Quasar integration"

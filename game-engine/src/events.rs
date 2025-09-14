@@ -49,6 +49,16 @@ pub enum BevyToJsEvent {
         request_id: String,
         message: String,
     },
+    /// Request to start camera capture on JS side
+    CameraStart {
+        request_id: String,
+        width: u32,
+        height: u32,
+    },
+    /// Request to stop camera capture
+    CameraStop {
+        request_id: String,
+    },
 }
 
 /// Events that TypeScript sends back to Bevy
@@ -87,6 +97,17 @@ pub enum JsToBevyEvent {
     SettingsUpdated {
         request_id: String,
         settings: SharedSettings,
+    },
+    /// Toggle on-screen camera preview and scale
+    CameraPreviewToggle {
+        request_id: String,
+        enabled: bool,
+        scale: Option<f32>,
+        anchor: Option<String>,
+        margin: Option<f32>,
+        offset_x: Option<f32>,
+        offset_y: Option<f32>,
+        mirror_x: Option<bool>,
     },
 }
 
@@ -146,6 +167,7 @@ pub fn handle_js_to_bevy_events(
     mut js_to_bevy_events: EventReader<JsToBevyEvent>,
     mut pending_requests: ResMut<PendingRequests>,
     mut shared_settings: ResMut<SharedSettings>,
+    mut preview_control: Option<ResMut<crate::camera::CameraPreviewControl>>,
 ) {
     for event in js_to_bevy_events.read() {
         match event {
@@ -194,6 +216,29 @@ pub fn handle_js_to_bevy_events(
                     shared_settings.bgm_volume,
                     shared_settings.sfx_volume
                 );
+            }
+            JsToBevyEvent::CameraPreviewToggle { request_id, enabled, scale, anchor, margin, offset_x, offset_y, mirror_x } => {
+                console_log!("📷 Preview toggle ({}): enabled={} scale={:?} anchor={:?} margin={:?} off=({:?},{:?}) mirror_x={:?}",
+                    request_id, enabled, scale, anchor, margin, offset_x, offset_y, mirror_x);
+                if let Some(ref mut ctrl) = preview_control {
+                    ctrl.enabled = *enabled;
+                    if let Some(s) = scale { ctrl.scale = *s; }
+                    if let Some(a) = anchor {
+                        ctrl.anchor = match a.as_str() {
+                            "TopLeft" => crate::camera::PreviewAnchor::TopLeft,
+                            "TopRight" => crate::camera::PreviewAnchor::TopRight,
+                            "BottomLeft" => crate::camera::PreviewAnchor::BottomLeft,
+                            "BottomRight" => crate::camera::PreviewAnchor::BottomRight,
+                            _ => ctrl.anchor.clone(),
+                        };
+                    }
+                    if let Some(m) = margin { ctrl.margin = *m; }
+                    if let Some(x) = offset_x { ctrl.offset_x = *x; }
+                    if let Some(y) = offset_y { ctrl.offset_y = *y; }
+                    if let Some(m) = mirror_x { ctrl.mirror_x = *m; }
+                } else {
+                    console_warn!("CameraPreviewControl resource not available yet");
+                }
             }
         }
     }

@@ -226,6 +226,24 @@ onMounted(async () => {
       console.debug('[A4D][WASM] module initialized')
       
       gameEngine = new wasmModule.GameEngine()
+      // Expose game engine globally for camera debug panel and other components
+      if (window.__A4D_WASM__) {
+        try {
+          Object.defineProperty(window.__A4D_WASM__, 'game_engine', {
+            value: gameEngine,
+            writable: true,
+            configurable: true
+          })
+        } catch (error) {
+          console.warn('Could not add game_engine to WASM module, creating new reference:', error)
+          // Fallback: create a new extensible object with the WASM module + game engine
+          const originalWasm = window.__A4D_WASM__
+          window.__A4D_WASM__ = {
+            ...originalWasm,
+            game_engine: gameEngine
+          }
+        }
+      }
     } else {
       throw new Error('WASM module not available')
     }

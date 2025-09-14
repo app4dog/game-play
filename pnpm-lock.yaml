@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@capacitor-community/camera-preview':
+        specifier: ^7.0.2
+        version: 7.0.2(@capacitor/core@7.4.3)
       '@quasar/extras':
         specifier: ^1.16.4
         version: 1.17.0
@@ -107,6 +110,12 @@ packages:
 
   '@bufbuild/protobuf@2.7.0':
     resolution: {integrity: sha512-qn6tAIZEw5i/wiESBF4nQxZkl86aY4KoO0IkUa2Lh+rya64oTOdJQFlZuMwI1Qz9VBJQrQC4QlSA2DNek5gCOA==}
+
+  '@capacitor-community/camera-preview@7.0.2':
+    resolution: {integrity: sha512-F30KQwm1UsFMJEG/A6vEoHLoHngD3CcF7zYzB/BIEDNGn+njbkZNEluHhMHkQqAQdkArD+2O04IntpL/oL3SqA==}
+    engines: {node: '>=18.0.0', npm: '>=9.0.0'}
+    peerDependencies:
+      '@capacitor/core': '>=7.0.0'
 
   '@capacitor/android@7.4.3':
     resolution: {integrity: sha512-VpjvnOcmYGPLgvXRhe3CGLs62Cg7sxOyp77NddCr+Y06qqgnoaj6OGeBVTc2DZlqZ6bSmh15JvFu82pkvmdgfQ==}
@@ -2962,6 +2971,10 @@ snapshots:
       '@babel/helper-validator-identifier': 7.27.1
 
   '@bufbuild/protobuf@2.7.0': {}
+
+  '@capacitor-community/camera-preview@7.0.2(@capacitor/core@7.4.3)':
+    dependencies:
+      '@capacitor/core': 7.4.3
 
   '@capacitor/android@7.4.3(@capacitor/core@7.4.3)':
     dependencies:

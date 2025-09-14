@@ -6,12 +6,15 @@ import { ref, onMounted, onUnmounted } from 'vue'
 
 // TypeScript types matching the Rust events (manually synced)
 export interface BevyToJsEvent {
-  type: 'PlayAudio' | 'BluetoothScan' | 'TestEvent'
+  type: 'PlayAudio' | 'BluetoothScan' | 'TestEvent' | 'CameraStart' | 'CameraStop'
   request_id?: string
   sound_id?: string
   volume?: number
   device_filter?: string
   message?: string
+  // Camera options
+  width?: number
+  height?: number
 }
 
 export interface JsToBevyEvent {
@@ -46,6 +49,8 @@ export class BevyEventBridge {
     this.eventHandlers.set('PlayAudio', this.handlePlayAudio.bind(this))
     this.eventHandlers.set('BluetoothScan', this.handleBluetoothScan.bind(this))
     this.eventHandlers.set('TestEvent', this.handleTestEvent.bind(this))
+    this.eventHandlers.set('CameraStart', this.handleCameraStart.bind(this))
+    this.eventHandlers.set('CameraStop', this.handleCameraStop.bind(this))
   }
 
   init() {
@@ -71,6 +76,29 @@ export class BevyEventBridge {
     window.addEventListener('bevy-to-js-event', this.boundEventHandler)
     this.isInitialized = true
     console.log('🔗 BevyEventBridge initialized')
+  }
+
+  private async handleCameraStart(event: BevyToJsEvent): Promise<void> {
+    const { width = 640, height = 480 } = event
+    try {
+      const { cameraService } = await import('../services/CameraService')
+      await cameraService.start({ width, height, rear: true })
+      console.log('📷 Camera started', { width, height })
+    } catch (error) {
+      console.error('❌ Failed to start camera:', error)
+      if (event.request_id) this.sendErrorToBevy(event.request_id, 'Failed to start camera')
+    }
+  }
+
+  private async handleCameraStop(event: BevyToJsEvent): Promise<void> {
+    try {
+      const { cameraService } = await import('../services/CameraService')
+      await cameraService.stop()
+      console.log('📷 Camera stopped')
+    } catch (error) {
+      console.error('❌ Failed to stop camera:', error)
+      if (event.request_id) this.sendErrorToBevy(event.request_id, 'Failed to stop camera')
+    }
   }
 
   destroy() {

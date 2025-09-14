@@ -81,6 +81,34 @@
 
       <q-separator inset />
 
+      <!-- Camera Debug Section -->
+      <q-card-section>
+        <div class="text-subtitle2 q-mb-sm">Camera Controls</div>
+        <div class="row q-gutter-sm">
+          <q-btn color="teal" label="📷 Start Camera (event)" size="sm" @click="sendCameraStart()" class="col" />
+          <q-btn color="grey-8" label="📷 Stop Camera (event)" size="sm" @click="sendCameraStop()" class="col" />
+        </div>
+        <div class="row q-gutter-sm items-center q-mt-sm">
+          <q-toggle v-model="cameraPreviewEnabled" label="Show Preview" color="teal" @update:model-value="sendCameraPreviewToggle" />
+          <div class="col-auto text-caption">Scale</div>
+          <q-slider class="col" v-model.number="cameraPreviewScale" :min="0.1" :max="1.5" :step="0.05" color="teal" @update:model-value="sendCameraPreviewToggle" />
+        </div>
+        <div class="row q-gutter-sm items-center q-mt-sm">
+          <div class="col-auto text-caption">Anchor</div>
+          <q-select class="col" v-model="cameraPreviewAnchor" :options="anchorOptions" dense emit-value map-options @update:model-value="sendCameraPreviewToggle" />
+          <div class="col-auto text-caption">Margin</div>
+          <q-slider class="col" v-model.number="cameraPreviewMargin" :min="0" :max="64" :step="1" color="teal" @update:model-value="sendCameraPreviewToggle" />
+        </div>
+        <div class="row q-gutter-sm items-center q-mt-sm">
+          <q-toggle v-model="cameraPreviewMirror" label="Mirror X" color="teal" @update:model-value="sendCameraPreviewToggle" />
+        </div>
+        <div class="q-mt-md">
+          <CameraDebugPanel />
+        </div>
+      </q-card-section>
+
+      <q-separator inset />
+
       <q-card-section>
         <div class="text-subtitle2 q-mb-sm">Audio Settings</div>
         <div class="row items-center q-gutter-sm">
@@ -216,8 +244,10 @@ interface GameEngine {
 import CritterSelection from '../components/CritterSelection.vue'
 import GameSettings from '../components/GameSettings.vue'
 import BluetoothDebugPanel from '../components/BluetoothDebugPanel.vue'
+import CameraDebugPanel from '../components/CameraDebugPanel.vue'
 import { bluetoothService } from '../services/BluetoothService'
-import type { GameEngine as ExtendedGameEngine } from '../types/GameEngineExtended'
+// 🤓 Use auto-generated types instead of manual duplicates
+import type { GameEngine as ExtendedGameEngine } from '../types/wasm-types'
 
 const $q = useQuasar()
 
@@ -230,6 +260,17 @@ const showCritterSelection = ref(false)
 const showSettings = ref(false)
 const showDebugPanel = ref(false)
 const showBluetoothPanel = ref(false)
+const cameraPreviewEnabled = ref(true)
+const cameraPreviewScale = ref(0.5)
+const cameraPreviewAnchor = ref<'TopLeft' | 'TopRight' | 'BottomLeft' | 'BottomRight'>('TopRight')
+const cameraPreviewMargin = ref(12)
+const cameraPreviewMirror = ref(false)
+const anchorOptions = [
+  { label: 'Top Left', value: 'TopLeft' },
+  { label: 'Top Right', value: 'TopRight' },
+  { label: 'Bottom Left', value: 'BottomLeft' },
+  { label: 'Bottom Right', value: 'BottomRight' },
+]
 
 // Game stats
 const highScore = ref(0)
@@ -339,6 +380,38 @@ const startGame = async () => {
     position: 'top',
     timeout: 3000
   })
+}
+
+function sendCameraStart() {
+  const ev = { type: 'CameraStart', request_id: `cam-${Date.now()}`, width: 640, height: 480 }
+  const s = JSON.stringify(ev)
+  window.dispatchEvent(new CustomEvent('bevy-to-js-event', { detail: s }))
+  $q.notify({ type: 'info', message: 'Sent CameraStart', position: 'top', timeout: 1200 })
+}
+
+function sendCameraStop() {
+  const ev = { type: 'CameraStop', request_id: `cam-${Date.now()}` }
+  const s = JSON.stringify(ev)
+  window.dispatchEvent(new CustomEvent('bevy-to-js-event', { detail: s }))
+  $q.notify({ type: 'info', message: 'Sent CameraStop', position: 'top', timeout: 1200 })
+}
+
+function sendCameraPreviewToggle() {
+  const wasm = window.__A4D_WASM__
+  const ev = {
+    type: 'CameraPreviewToggle',
+    request_id: `cam-prev-${Date.now()}`,
+    enabled: cameraPreviewEnabled.value,
+    scale: cameraPreviewScale.value,
+    anchor: cameraPreviewAnchor.value,
+    margin: cameraPreviewMargin.value,
+    mirror_x: cameraPreviewMirror.value,
+  }
+  try {
+    wasm?.send_js_to_bevy_event?.(JSON.stringify(ev))
+  } catch (e) {
+    console.warn('Failed to send CameraPreviewToggle', e)
+  }
 }
 
 const retryInit = () => {

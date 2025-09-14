@@ -6,7 +6,8 @@
  */
 
 import { Notify } from 'quasar'
-import type { GameEngine } from '../types/GameEngineExtended'
+// 🤓 Use auto-generated types instead of manual duplicates
+import type { GameEngine } from '../types/wasm-types'
 
 // TypeScript interfaces matching Rust types
 export interface DeviceId {

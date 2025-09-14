@@ -15,7 +15,8 @@ export default defineConfigWithVueTs(
      *
      * ESLint requires "ignores" key to be the only one in this object
      */
-    // ignores: []
+    // 🤓 Ignore auto-generated WASM files to prevent linting errors on generated code
+    ignores: ['src/types/wasm/**/*']
   },
 
   pluginQuasar.configs.recommended(),

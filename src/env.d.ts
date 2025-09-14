@@ -13,26 +13,21 @@ declare global {
     input?: RequestInfo | URL | Response | BufferSource | WebAssembly.Module
   ) => Promise<void>
 
-  interface GameEngineApi {
-    start_game(): void
-    pause_game(): void
-    reset_game(): void
-    handle_interaction?(type: string, x: number, y: number, dir_x: number, dir_y: number): void
-    load_critter?(critter_id: number, name: string, species: string): void
-    load_critter_by_id?(id: string): void
-    get_critter_info?(): { id: number; name: string; species: string; happiness: number; energy: number }
-    unload_critter?(): void
-    free?(): void
-  }
+  // 🤓 Use auto-generated types instead of duplicating manually
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports -- referencing auto-generated WASM types
+  type GameEngineApi = import('../types/wasm-types').GameEngine
 
   interface UnifiedWasmModule {
     // Core WASM module functions (from GameCanvas)
     default: WasmInit
     GameEngine: new () => GameEngineApi
+    game_engine?: GameEngineApi
     
     // Event bridge functions
     send_event_to_bevy?: (eventJson: string) => void
     send_js_to_bevy_event?: (eventJson: string) => void
+    // Camera: submit raw frame bytes (RGB or YUV bytes)
+    submit_camera_frame?: (width: number, height: number, data: Uint8Array, ts: number) => void
     
     // Audio response functions  
     send_audio_response?: (responseJson: string) => void

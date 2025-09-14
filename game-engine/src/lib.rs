@@ -6,7 +6,8 @@ use std::sync::Mutex;
 use std::collections::VecDeque;
 
 mod audio;
-mod bluetoothle;
+mod bluetooth;
+mod camera;
 mod components;
 mod effects;
 mod events;
@@ -15,7 +16,15 @@ mod resources;
 mod systems;
 
 use audio::{PlatformAudioPlugin, send_audio_response_to_bevy};
-use bluetooth::{BluetoothPlugin, BluetoothRequest, BluetoothResponse, DeviceId, BluetoothDeviceFilter, create_test_virtual_devices};
+use bluetooth::{
+    BluetoothLEPlugin as BluetoothPlugin,
+    BluetoothLERequest as BluetoothRequest,
+    BluetoothLEResponse as BluetoothResponse,
+    BluetoothLEDeviceFilter as BluetoothDeviceFilter,
+    DeviceId,
+    create_test_virtual_devices,
+};
+use camera::CameraPlugin;
 use events::{EventBridgePlugin, BevyToJsEvent, send_js_to_bevy_event};
 use game::{GamePlugin, LoadCritterEvent, SpawnCritterEvent};
 use systems::process_click_on_critters;
@@ -48,6 +57,15 @@ pub struct CritterSummary {
 
 static CRITTER_LIST: Mutex<Vec<CritterSummary>> = Mutex::new(Vec::new());
 static CRITTERS_READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+// Camera preview control system
+#[derive(Debug, Clone)]
+pub enum CameraPreviewRequest {
+    Enable { scale: f32, anchor: String },
+    Disable,
+}
+
+static CAMERA_PREVIEW_QUEUE: Mutex<VecDeque<CameraPreviewRequest>> = Mutex::new(VecDeque::new());
 
 pub(crate) fn set_available_critters(list: Vec<CritterSummary>) {
     if let Ok(mut g) = CRITTER_LIST.lock() {
@@ -93,6 +111,7 @@ pub fn main() {
         .add_plugins(EventBridgePlugin)
         .add_plugins(PlatformAudioPlugin)
         .add_plugins(BluetoothPlugin)
+        .add_plugins(CameraPlugin)
         .add_plugins(effects::ExplosionEffectsPlugin)
         .add_systems(Update, (
             process_load_critter_queue,
@@ -101,6 +120,7 @@ pub fn main() {
             process_native_audio_queue,
             process_bluetooth_request_queue,
             process_bluetooth_response_queue,
+            process_camera_preview_queue,
         ))
         .run();
 }
@@ -372,6 +392,51 @@ impl GameEngine {
         
         status
     }
+
+    /// Submit camera frame data to the game engine
+    #[wasm_bindgen]
+    pub fn submit_camera_frame(&self, frame_data: &[u8], width: u32, height: u32, timestamp: f64) -> String {
+        let request_id = format!("frame-{}", timestamp as u64);
+        
+        // Convert frame data and trigger NewFrameEvent
+        // For now, we'll submit the frame through the resource system
+        console::log_1(&format!("📸 Submitted camera frame: {}x{} ({} bytes)", width, height, frame_data.len()).into());
+        
+        // TODO: Update CameraFrame resource and trigger NewFrameEvent
+        // This would require access to the Bevy World, which is not directly available here
+        // For now, we'll return the request ID to indicate the frame was received
+        
+        request_id
+    }
+
+    /// Enable camera preview in the game engine
+    #[wasm_bindgen]
+    pub fn enable_camera_preview(&self, scale: f32, anchor: &str) -> String {
+        let request_id = format!("preview-{}", js_sys::Date::now() as u64);
+        console::log_1(&format!("📹 Enabling camera preview: scale={}, anchor={}", scale, anchor).into());
+        
+        if let Ok(mut queue) = CAMERA_PREVIEW_QUEUE.lock() {
+            queue.push_back(CameraPreviewRequest::Enable {
+                scale,
+                anchor: anchor.to_string(),
+            });
+        }
+        
+        request_id
+    }
+
+    /// Disable camera preview in the game engine
+    #[wasm_bindgen]
+    pub fn disable_camera_preview(&self) -> String {
+        let request_id = format!("preview-off-{}", js_sys::Date::now() as u64);
+        console::log_1(&"📹 Disabling camera preview".into());
+        
+        if let Ok(mut queue) = CAMERA_PREVIEW_QUEUE.lock() {
+            queue.push_back(CameraPreviewRequest::Disable);
+        }
+        
+        request_id
+    }
 }
 
 /// Free functions to allow UI to query available critters without holding a GameEngine instance
@@ -548,6 +613,34 @@ fn process_bluetooth_response_queue(
         
         if let Ok(mut queue) = BLUETOOTH_RESPONSE_QUEUE.lock() {
             queue.push_back(response.clone());
+        }
+    }
+}
+
+// System to process camera preview control requests from WASM interface
+fn process_camera_preview_queue(
+    mut preview_control: ResMut<camera::CameraPreviewControl>,
+) {
+    if let Ok(mut queue) = CAMERA_PREVIEW_QUEUE.lock() {
+        while let Some(request) = queue.pop_front() {
+            match request {
+                CameraPreviewRequest::Enable { scale, anchor } => {
+                    console::log_1(&format!("📹 Processing camera preview enable: scale={}, anchor={}", scale, anchor).into());
+                    preview_control.enabled = true;
+                    preview_control.scale = scale;
+                    preview_control.anchor = match anchor.as_str() {
+                        "TopLeft" => camera::PreviewAnchor::TopLeft,
+                        "TopRight" => camera::PreviewAnchor::TopRight,
+                        "BottomLeft" => camera::PreviewAnchor::BottomLeft,
+                        "BottomRight" => camera::PreviewAnchor::BottomRight,
+                        _ => camera::PreviewAnchor::TopRight, // default
+                    };
+                }
+                CameraPreviewRequest::Disable => {
+                    console::log_1(&"📹 Processing camera preview disable".into());
+                    preview_control.enabled = false;
+                }
+            }
         }
     }
 }
