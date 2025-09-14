@@ -47,10 +47,10 @@ if [ "$HAS_WASM_PACK" = "1" ]; then
     echo "📦 Using wasm-pack to build + package"
     set +e
     if command -v wasm-pack &> /dev/null; then
-        # 🤓 Output directly to src/types to avoid copying and maintain single source of truth
+        # Output to src/types for TS consumption AND ensure public assets for CI/artifacts
         wasm-pack build --target web --out-dir ../src/types/wasm $BUILD_FLAGS
     else
-        # 🤓 Output directly to src/types to avoid copying and maintain single source of truth
+        # Output to src/types for TS consumption AND ensure public assets for CI/artifacts
         ~/.cargo/bin/wasm-pack build --target web --out-dir ../src/types/wasm $BUILD_FLAGS
     fi
     STATUS=$?
@@ -63,6 +63,24 @@ if [ "$HAS_WASM_PACK" = "1" ]; then
             cargo build --no-default-features --lib --target wasm32-unknown-unknown
         fi
         echo "ℹ️ wasm-bindgen/JS glue not generated (install wasm-bindgen and rerun wasm-pack)."
+    fi
+    # Ensure public/game-engine contains the built JS+WASM for CI and runtime
+    if [ ${STATUS:-0} -eq 0 ]; then
+      echo "📄 Copying WASM outputs to public/game-engine for CI and deploy..."
+      mkdir -p ../public/game-engine
+      # Copy standard wasm-pack artifacts if present in src/types/wasm
+      if ls ../src/types/wasm/*app4dog_game_engine*.wasm >/dev/null 2>&1; then
+        cp -f ../src/types/wasm/*app4dog_game_engine*.wasm ../public/game-engine/ || true
+      fi
+      if ls ../src/types/wasm/*app4dog_game_engine*.js >/dev/null 2>&1; then
+        cp -f ../src/types/wasm/*app4dog_game_engine*.js ../public/game-engine/ || true
+      fi
+      # If default pkg exists (in case of future changes), prefer copying from there
+      if [ -d ../game-engine/pkg ]; then
+        cp -f ../game-engine/pkg/*app4dog_game_engine*.wasm ../public/game-engine/ 2>/dev/null || true
+        cp -f ../game-engine/pkg/*app4dog_game_engine*.js ../public/game-engine/ 2>/dev/null || true
+      fi
+      echo "✅ Public WASM assets ready in public/game-engine/"
     fi
 else
     echo "🔧 Running plain cargo build for wasm32-unknown-unknown (no packaging)"
@@ -94,7 +112,7 @@ else
 fi
 
 # Files are automatically available via symlink: public/game-engine -> game-engine/pkg
-echo "📦 WASM files available via symlink (single source of truth), if packaging was done"
+echo "📦 WASM files available in public/game-engine/ and src/types/wasm/"
 
 # Generate TypeScript bindings for Vue components
 if [ "$HAS_WASM_PACK" = "1" ] && [ ${STATUS:-0} -eq 0 ]; then
