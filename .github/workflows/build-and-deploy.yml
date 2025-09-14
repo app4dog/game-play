@@ -24,14 +24,19 @@ jobs:
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
         
+      # pnpm must be available before setup-node with cache: pnpm,
+      # because the action calls `pnpm store path` to determine cache dir
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
-          
-      - name: Install pnpm
-        run: npm install -g pnpm
         
       - name: Install just
         run: curl -sS https://webi.sh/just | sh && echo "$HOME/.local/bin" >> $GITHUB_PATH
