@@ -15,3 +15,12 @@ export type {
   submit_camera_frame,
   send_audio_response_to_bevy
 } from './wasm/app4dog_game_engine'
+
+// 🤓 Type-safe interfaces for WASM functions that return generic objects
+// These supplement the auto-generated types with proper TypeScript interfaces
+export interface BluetoothStatus {
+  scanning: boolean
+  connectedDevices: number
+  discoveredDevices: number
+  virtualNetworkEnabled: boolean
+}

@@ -32,8 +32,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import type { Ref } from 'vue'
-// Unified WASM types are now globally declared
-// Type-only import mapped by src/types/game-engine.d.ts
+// 🤓 Import auto-generated WASM types directly
+import type { GameEngine as WasmGameEngine } from '../types/wasm/app4dog_game_engine'
 
 // GameEngineApi now imported from unified types
 
@@ -142,7 +142,8 @@ const spriteLoadInfo = ref<{ total: number; loaded: number; failed: string[] }>(
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 let _rafIdLocal: number | null = null
 
-let gameEngine: GameEngineApi | null = null
+// 🤓 Use direct import for clean type reference
+let gameEngine: WasmGameEngine | null = null
 let wasmModule: UnifiedWasmModule | null = null
 
 // Touch/mouse interaction state

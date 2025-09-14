@@ -7,7 +7,7 @@
 
 import { Notify } from 'quasar'
 // 🤓 Use auto-generated types instead of manual duplicates
-import type { GameEngine } from '../types/wasm-types'
+import type { GameEngine, BluetoothStatus } from '../types/wasm-types'
 
 // TypeScript interfaces matching Rust types
 export interface DeviceId {
@@ -408,9 +408,10 @@ export class BluetoothService {
   /**
    * Get current Bluetooth status
    */
-  getStatus() {
+  getStatus(): BluetoothStatus {
     if (this.gameEngine) {
-      return this.gameEngine.get_bluetooth_status()
+      // 🤓 Cast WASM object return to proper TypeScript interface
+      return this.gameEngine.get_bluetooth_status() as BluetoothStatus
     }
     
     return {
