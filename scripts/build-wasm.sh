@@ -72,6 +72,7 @@ fi
 
 # Files are automatically available via symlink: public/game-engine -> game-engine/pkg
 echo "📦 WASM files available via symlink (single source of truth)"
+echo "📦 WASM files available via symlink (single source of truth)"
 
 # Generate TypeScript bindings for Vue components
 echo "🔧 Generating TypeScript bindings..."
