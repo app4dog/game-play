@@ -532,7 +532,8 @@ function startFallbackRenderLoop(): void {
 
     for (const s of spriteConfig) {
       if (!s.image) { x += 128 + margin; continue }
-      const frame = Math.floor(elapsed * s.frameRate) % Math.max(1, s.frameCount)
+      const effectiveFps = Math.min(60, Math.max(1, s.frameRate * 1.75))
+      const frame = Math.floor(elapsed * effectiveFps) % Math.max(1, s.frameCount)
       const sx = frame * s.frameWidth
       const sy = 0
       // Draw scaled down to targetSize x targetSize (maintain square)
