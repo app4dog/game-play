@@ -8,6 +8,17 @@ MODE=${WASM_MODE:-dev}
 
 echo "🦀 Building App4.Dog Game Engine (Rust -> WASM) [${MODE} mode]"
 
+# Verbose diagnostics for CI
+echo "🔎 Tool versions:"
+set +e
+rustc --version || true
+cargo --version || true
+wasm-pack --version || ~/.cargo/bin/wasm-pack --version || true
+echo "RUSTFLAGS=$RUSTFLAGS"
+set -e
+
+export RUST_BACKTRACE=1
+
 # Load Rust environment
 . ~/.cargo/env 2>/dev/null || true
 
