@@ -37,3 +37,6 @@ public/game-engine/*.wasm
  
 # Audio assets (exclude committed MP3s)
 public/assets/audio/**/*.mp3
+
+# Android build outputs (APKs are large binary files)
+android-build-output/
