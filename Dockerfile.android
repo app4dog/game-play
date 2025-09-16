@@ -1,8 +1,8 @@
 # Stage 1: Get artifacts from local Docker image
 FROM app4dog-artifacts:latest AS artifacts
 
-# Stage 2: Use official Android build image with Java and Gradle pre-installed
-FROM docker.io/cimg/android:2024.01.1-node
+# Stage 2: Use newer Android build image with Java 21
+FROM docker.io/cimg/android:2024.10.1-node
 
 # Install pnpm globally as root
 USER root
@@ -21,8 +21,11 @@ COPY --chown=circleci:circleci . .
 # Copy artifacts from the artifacts stage
 COPY --from=artifacts --chown=circleci:circleci /artifacts ./artifacts
 
+# Copy critters directly from artifacts to public directory
+COPY --from=artifacts --chown=circleci:circleci /artifacts/critters ./public/critters
+
 # Install Node.js dependencies
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Build the web app
 RUN pnpm run build
@@ -34,10 +37,18 @@ RUN npx cap sync android
 ENV ANDROID_HOME=/opt/android/sdk
 ENV PATH=$PATH:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools
 
+# Check Java version and set compatibility
+RUN java -version
+RUN which java
+
+# Set Java compatibility for Gradle build (use Java 17 instead of 21)
+ENV GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
+ENV ORG_GRADLE_PROJECT_android.useAndroidX=true
+ENV ORG_GRADLE_PROJECT_android.enableJetifier=true
+
 # Build the APK with increased memory and compatibility settings
 WORKDIR /app/android
-ENV GRADLE_OPTS="-Dorg.gradle.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
-RUN ./gradlew assembleDebug --no-daemon --stacktrace
+RUN ./gradlew assembleDebug --no-daemon --stacktrace -PjavaVersion=17
 
 # Copy APK to output directory
 RUN mkdir -p /app/output

@@ -71,6 +71,15 @@ jobs:
     - name: Install Node dependencies
       run: pnpm install
       
+    - name: Build critter-keeper WASM (external)
+      run: |
+        set -e
+        echo "🔧 Building critter-keeper to src/types/critter-keeper (web target)"
+        cd critter-keeper
+        ~/.cargo/bin/wasm-pack build --target web --out-dir ../src/types/critter-keeper --release
+        echo "✅ critter-keeper WASM built"
+        cd -
+        
     - name: Build WASM game engine
       run: just build-wasm
       
