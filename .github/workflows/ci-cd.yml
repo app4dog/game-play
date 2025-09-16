@@ -18,6 +18,13 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
     - name: Pull critter-keeper artifacts from Docker
       run: |
         echo "🐳 Pulling pre-built critter-keeper artifacts from ghcr.io/app4dog/critter-keeper:0.1.0"
