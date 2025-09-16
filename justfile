@@ -47,7 +47,16 @@ dev-android: build-wasm
 # Build Android APK using Docker (no local Android SDK required)
 build-android-docker: build-wasm build
     @echo "🐳 Building Android APK using Docker..."
-    ./build-android.sh
+    @echo "🏗️ Building WASM game engine for mobile..."
+    @chmod +x scripts/build-wasm.sh
+    @./scripts/build-wasm.sh
+    @echo "🏗️ Building Quasar application..."
+    @pnpm run build
+    @echo "🐳 Building Android APK using Docker..."
+    @mkdir -p ./android-build-output
+    @podman build -t app4dog-android-builder -f Dockerfile.android .
+    @podman run --rm -v $(pwd)/android-build-output:/output localhost/app4dog-android-builder:latest cp /app/output/app-debug.apk /output/app4dog-game.apk
+    @echo "✅ Android APK build complete! APK: android-build-output/app4dog-game.apk"
 
 dev-ios: build-wasm
     @echo "📱 Starting iOS development..."
@@ -67,6 +76,40 @@ cap-open-android:
 cap-open-ios:
     @echo "📱 Opening Xcode..."
     npx cap open ios
+
+# Android APK deployment commands
+install-apk:
+    @echo "📱 Installing APK to connected Android device..."
+    @if [ ! -f "android-build-output/app4dog-game.apk" ]; then \
+        echo "❌ APK not found. Run 'just build-android-docker' first"; \
+        exit 1; \
+    fi
+    @echo "🔍 Checking for connected Android devices..."
+    @adb devices
+    @echo "📦 Installing app4dog-game.apk..."
+    @adb install -r android-build-output/app4dog-game.apk
+    @echo "✅ APK installed successfully!"
+
+# Uninstall the app from connected device
+uninstall-apk:
+    @echo "🗑️ Uninstalling App4.Dog from connected Android device..."
+    @adb uninstall dog.app4.game
+    @echo "✅ App uninstalled successfully!"
+
+# Launch the installed app
+launch-app:
+    @echo "🚀 Launching App4.Dog on connected Android device..."
+    @adb shell am start -n dog.app4.game/.MainActivity
+    @echo "✅ App launched!"
+
+# Full deployment: build + install + launch
+deploy-android: build-android-docker install-apk launch-app
+    @echo "🎉 Full Android deployment complete!"
+
+# Check connected Android devices
+adb-devices:
+    @echo "🔍 Checking connected Android devices..."
+    @adb devices -l
 
 
 # Testing and linting
@@ -137,6 +180,13 @@ info:
     @echo "  game-engine/  - Rust/Bevy game logic"
     @echo "  public/assets/ - Game sprites, audio, fonts"
     @echo "  scripts/      - Build and deployment scripts"
+    @echo ""
+    @echo "📱 Android Commands:"
+    @echo "  just build-android-docker  - Build APK using Docker"
+    @echo "  just install-apk          - Install APK to device via ADB"
+    @echo "  just launch-app           - Launch installed app"
+    @echo "  just deploy-android       - Full build + install + launch"
+    @echo "  just adb-devices          - List connected Android devices"
 
 # Development workflow
 dev-full: clean install build-wasm dev
