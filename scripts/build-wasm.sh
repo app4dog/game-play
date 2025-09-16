@@ -54,6 +54,12 @@ else
     BUILD_FLAGS="--dev"
 fi
 
+# Add custom features if specified
+if [ -n "$WASM_FEATURES" ]; then
+    echo "🎛️ Using custom features: $WASM_FEATURES"
+    BUILD_FLAGS="$BUILD_FLAGS $WASM_FEATURES"
+fi
+
 if [ "$HAS_WASM_PACK" = "1" ]; then
     echo "📦 Using wasm-pack to build + package"
     set +e

@@ -30,28 +30,28 @@ jobs:
         echo "🐳 Pulling pre-built critter-keeper artifacts from ghcr.io/app4dog/critter-keeper:0.1.0"
         docker pull ghcr.io/app4dog/critter-keeper:0.1.0
         
-        echo "📦 Extracting critter-keeper source and artifacts"
-        mkdir -p critter-keeper-extracted
+        echo "📦 Extracting critter-keeper artifacts from container"
+        mkdir -p src/types/critter-keeper
         
-        # Create a temporary container to copy full source from
+        # Create a temporary container to explore and copy from
         CONTAINER_ID=$(docker create ghcr.io/app4dog/critter-keeper:0.1.0)
         
-        # Copy the full critter-keeper source to extracted directory
-        docker cp "$CONTAINER_ID:/." critter-keeper-extracted/ || echo "Using fallback source path"
+        echo "🔍 Exploring container contents..."
+        docker cp "$CONTAINER_ID:/." container-contents/ || echo "Container extraction failed"
+        find container-contents/ -name "*.d.ts" -o -name "*.js" -o -name "*.wasm" | head -20
         
-        # Clean up the temporary container
+        # Copy any TypeScript artifacts we find
+        docker cp "$CONTAINER_ID:/pkg/." src/types/critter-keeper/ 2>/dev/null || echo "No /pkg artifacts"
+        docker cp "$CONTAINER_ID:/artifacts/." src/types/critter-keeper/ 2>/dev/null || echo "No /artifacts" 
+        docker cp "$CONTAINER_ID:/wasm/." src/types/critter-keeper/ 2>/dev/null || echo "No /wasm"
+        docker cp "$CONTAINER_ID:/types/." src/types/critter-keeper/ 2>/dev/null || echo "No /types"
+        
+        # Clean up
         docker rm "$CONTAINER_ID"
+        rm -rf container-contents/
         
-        # Create symlink at expected location (../../critter-keeper relative to game-engine/)
-        ln -sf "$(pwd)/critter-keeper-extracted" "$(pwd)/critter-keeper"
-        
-        echo "✅ critter-keeper source symlinked"
-        ls -la critter-keeper/
-        
-        # Also create artifacts for TypeScript if available
-        mkdir -p src/types/critter-keeper
-        cp -r critter-keeper-extracted/pkg/* src/types/critter-keeper/ 2>/dev/null || echo "No pkg artifacts found"
-        cp -r critter-keeper-extracted/artifacts/* src/types/critter-keeper/ 2>/dev/null || echo "No artifacts found"
+        echo "✅ critter-keeper artifacts extracted (if any)"
+        ls -la src/types/critter-keeper/ || echo "No artifacts directory"
       
     - name: Setup pnpm
       uses: pnpm/action-setup@v2
@@ -101,7 +101,7 @@ jobs:
       run: pnpm install
       
     - name: Build WASM game engine
-      run: just build-wasm
+      run: WASM_FEATURES="--no-default-features --features camera_sprite_preview" just build-wasm
       
     - name: Build Quasar app
       run: pnpm run build
