@@ -14,6 +14,12 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
+    - name: Checkout critter-keeper dependency
+      uses: actions/checkout@v4
+      with:
+        repository: app4dog/critter-keeper
+        path: critter-keeper
+      
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
@@ -26,11 +32,9 @@ jobs:
         run_install: false
         
     - name: Setup Rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: stable
-        target: wasm32-unknown-unknown
-        override: true
+        targets: wasm32-unknown-unknown
         
     - name: Install wasm-pack
       run: cargo install wasm-pack
