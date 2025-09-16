@@ -40,11 +40,8 @@ jobs:
         docker cp "$CONTAINER_ID:/." container-contents/ || echo "Container extraction failed"
         find container-contents/ -name "*.d.ts" -o -name "*.js" -o -name "*.wasm" | head -20
         
-        # Copy any TypeScript artifacts we find
-        docker cp "$CONTAINER_ID:/pkg/." src/types/critter-keeper/ 2>/dev/null || echo "No /pkg artifacts"
-        docker cp "$CONTAINER_ID:/artifacts/." src/types/critter-keeper/ 2>/dev/null || echo "No /artifacts" 
-        docker cp "$CONTAINER_ID:/wasm/." src/types/critter-keeper/ 2>/dev/null || echo "No /wasm"
-        docker cp "$CONTAINER_ID:/types/." src/types/critter-keeper/ 2>/dev/null || echo "No /types"
+        # Copy TypeScript artifacts from the correct path
+        docker cp "$CONTAINER_ID:/opt/critter-keeper/pkg/." src/types/critter-keeper/ || echo "Failed to copy critter-keeper artifacts"
         
         # Clean up
         docker rm "$CONTAINER_ID"
