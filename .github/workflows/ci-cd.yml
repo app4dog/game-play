@@ -21,8 +21,10 @@ jobs:
     - name: Checkout critter-keeper dependency
       uses: actions/checkout@v4
       with:
-        repository: app4dog/critter-keeper
-        path: critter-keeper
+        repository: app4dog/workspace
+        path: workspace
+        sparse-checkout: |
+          critter-keeper
       
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -75,8 +77,8 @@ jobs:
       run: |
         set -e
         echo "🔧 Building critter-keeper to src/types/critter-keeper (web target)"
-        cd critter-keeper
-        ~/.cargo/bin/wasm-pack build --target web --out-dir ../src/types/critter-keeper --release
+        cd workspace/critter-keeper
+        ~/.cargo/bin/wasm-pack build --target web --out-dir ../../src/types/critter-keeper --release
         echo "✅ critter-keeper WASM built"
         cd -
         
