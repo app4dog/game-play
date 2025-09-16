@@ -18,14 +18,26 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       
-    - name: Checkout critter-keeper dependency
-      uses: actions/checkout@v4
-      with:
-        repository: app4dog/workspace
-        token: ${{ secrets.GITHUB_TOKEN }}
-        path: workspace
-        sparse-checkout: |
-          critter-keeper
+    - name: Pull critter-keeper artifacts from Docker
+      run: |
+        echo "🐳 Pulling pre-built critter-keeper artifacts from ghcr.io/app4dog/critter-keeper:0.1.0"
+        docker pull ghcr.io/app4dog/critter-keeper:0.1.0
+        
+        echo "📦 Extracting critter-keeper WASM artifacts"
+        mkdir -p src/types/critter-keeper
+        
+        # Create a temporary container to copy artifacts from
+        CONTAINER_ID=$(docker create ghcr.io/app4dog/critter-keeper:0.1.0)
+        
+        # Copy WASM artifacts to the expected location
+        docker cp "$CONTAINER_ID:/artifacts/." src/types/critter-keeper/ || echo "Using fallback artifact path"
+        docker cp "$CONTAINER_ID:/pkg/." src/types/critter-keeper/ || echo "Artifacts already copied"
+        
+        # Clean up the temporary container
+        docker rm "$CONTAINER_ID"
+        
+        echo "✅ critter-keeper WASM artifacts ready"
+        ls -la src/types/critter-keeper/
       
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -74,15 +86,6 @@ jobs:
     - name: Install Node dependencies
       run: pnpm install
       
-    - name: Build critter-keeper WASM (external)
-      run: |
-        set -e
-        echo "🔧 Building critter-keeper to src/types/critter-keeper (web target)"
-        cd workspace/critter-keeper
-        ~/.cargo/bin/wasm-pack build --target web --out-dir ../../src/types/critter-keeper --release
-        echo "✅ critter-keeper WASM built"
-        cd -
-        
     - name: Build WASM game engine
       run: just build-wasm
       
