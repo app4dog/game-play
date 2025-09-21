@@ -37,12 +37,12 @@ jobs:
     - name: Clone workspace and symlink critter-keeper
       run: |
         echo "📂 Cloning workspace repository"
-        git clone --filter=blob:none --sparse https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/app4dog/workspace.git /workspace
-        cd /workspace
+        git clone --filter=blob:none --sparse https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/app4dog/workspace.git ~/workspace
+        cd ~/workspace
         git sparse-checkout set critter-keeper
         
         echo "📁 Creating symlink for critter-keeper"
-        ln -sf /workspace/critter-keeper ../critter-keeper
+        ln -sf ~/workspace/critter-keeper ../critter-keeper
         
         echo "✅ critter-keeper symlink created"
         echo "📂 Final ../critter-keeper contents:"
