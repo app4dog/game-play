@@ -34,31 +34,17 @@ jobs:
         owner: app4dog
         repositories: workspace
 
-    - name: Clone critter-keeper directory from workspace
+    - name: Clone workspace and symlink critter-keeper
       run: |
-        echo "📂 Cloning only critter-keeper directory from workspace repository"
-        git clone --filter=blob:none --sparse https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/app4dog/workspace.git ../workspace
-        cd ../workspace
+        echo "📂 Cloning workspace repository"
+        git clone --filter=blob:none --sparse https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/app4dog/workspace.git /workspace
+        cd /workspace
         git sparse-checkout set critter-keeper
         
-        echo "📂 Contents of workspace after sparse checkout:"
-        ls -la
+        echo "📁 Creating symlink for critter-keeper"
+        ln -sf /workspace/critter-keeper ../critter-keeper
         
-        echo "📁 Moving critter-keeper source to expected location"
-        if [ -d "critter-keeper" ]; then
-          mv critter-keeper ../critter-keeper
-          echo "✅ Successfully moved critter-keeper directory"
-        else
-          echo "❌ critter-keeper directory not found in workspace"
-          echo "Available directories:"
-          ls -la
-          exit 1
-        fi
-        
-        cd ..
-        rm -rf workspace
-        
-        echo "✅ critter-keeper source extracted via sparse checkout"
+        echo "✅ critter-keeper symlink created"
         echo "📂 Final ../critter-keeper contents:"
         ls -la ../critter-keeper/
         test -f ../critter-keeper/Cargo.toml || (echo "❌ critter-keeper/Cargo.toml not found" && exit 1)
