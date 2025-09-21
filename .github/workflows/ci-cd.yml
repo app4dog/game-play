@@ -25,10 +25,19 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
         
+    - name: Generate GitHub App token
+      id: app-token
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ secrets.GH_APP_ID }}
+        private-key: ${{ secrets.GH_APP_SECRET }}
+        owner: app4dog
+        repositories: workspace
+
     - name: Clone critter-keeper directory from workspace
       run: |
         echo "📂 Cloning only critter-keeper directory from workspace repository"
-        git clone --filter=blob:none --sparse https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/app4dog/workspace.git ../workspace
+        git clone --filter=blob:none --sparse https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/app4dog/workspace.git ../workspace
         cd ../workspace
         git sparse-checkout set critter-keeper
         
