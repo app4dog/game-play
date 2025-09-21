@@ -25,20 +25,25 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
         
-    - name: Pull critter-keeper source from GHCR
+    - name: Install oras
       run: |
-        echo "🐳 Pulling critter-keeper source from ghcr.io/app4dog/critter-keeper-oci:0.1.0"
-        docker pull ghcr.io/app4dog/critter-keeper-oci:0.1.0
+        echo "📦 Installing oras for OCI artifact handling"
+        curl -LO "https://github.com/oras-project/oras/releases/download/v1.2.0/oras_1.2.0_linux_amd64.tar.gz"
+        mkdir -p oras-install/
+        tar -zxf oras_*.tar.gz -C oras-install/
+        sudo mv oras-install/oras /usr/local/bin/
+        rm -rf oras_*.tar.gz oras-install/
+        oras version
+    
+    - name: Pull critter-keeper source from OCI artifact
+      run: |
+        echo "🐳 Pulling critter-keeper source OCI artifact from ghcr.io/app4dog/critter-keeper-oci:0.1.0"
         
-        echo "📦 Extracting critter-keeper source code to expected path"
-        CONTAINER_ID=$(docker create ghcr.io/app4dog/critter-keeper:0.1.0)
-        
-        # Extract critter-keeper source to the path expected by Cargo.toml
+        # Create directory for extraction
         mkdir -p ../critter-keeper
-        docker cp "$CONTAINER_ID:/opt/critter-keeper/." ../critter-keeper/
         
-        # Clean up container
-        docker rm "$CONTAINER_ID"
+        # Use oras to pull OCI artifact containing source code
+        oras pull ghcr.io/app4dog/critter-keeper-oci:0.1.0 --output ../critter-keeper
         
         echo "✅ critter-keeper source extracted"
         ls -la ../critter-keeper/
