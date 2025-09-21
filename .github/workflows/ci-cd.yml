@@ -41,7 +41,8 @@ jobs:
         cd ~/workspace
         git sparse-checkout set critter-keeper
         
-        echo "📁 Creating symlink for critter-keeper" 
+        echo "📁 Creating symlink for critter-keeper in game-play repo" 
+        cd $GITHUB_WORKSPACE
         ln -sf ~/workspace/critter-keeper ./critter-keeper
         
         echo "✅ critter-keeper symlink created"
