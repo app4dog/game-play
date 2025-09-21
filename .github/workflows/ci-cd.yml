@@ -28,7 +28,7 @@ jobs:
     - name: Clone critter-keeper directory from workspace
       run: |
         echo "📂 Cloning only critter-keeper directory from workspace repository"
-        git clone --filter=blob:none --sparse https://github.com/app4dog/workspace.git ../workspace
+        git clone --filter=blob:none --sparse https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/app4dog/workspace.git ../workspace
         cd ../workspace
         git sparse-checkout set critter-keeper
         
