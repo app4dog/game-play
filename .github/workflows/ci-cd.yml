@@ -17,13 +17,6 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Generate GitHub App token
       id: app-token
@@ -36,21 +29,46 @@ jobs:
 
     - name: Clone workspace and symlink critter-keeper
       run: |
+        set -e  # Exit on any error
         echo "📂 Cloning workspace repository"
-        git clone --filter=blob:none --sparse https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/app4dog/workspace.git ~/workspace
+        if ! git clone --filter=blob:none --sparse https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/app4dog/workspace.git ~/workspace; then
+          echo "❌ Failed to clone workspace repository"
+          exit 1
+        fi
+        
         cd ~/workspace
-        git sparse-checkout set critter-keeper
+        if ! git sparse-checkout set critter-keeper; then
+          echo "❌ Failed to configure sparse checkout for critter-keeper"
+          exit 1
+        fi
+        
+        # Verify critter-keeper was actually checked out
+        if [ ! -d "critter-keeper" ]; then
+          echo "❌ critter-keeper directory not found after sparse checkout"
+          exit 1
+        fi
         
         echo "📁 Creating symlink for critter-keeper in game-play repo" 
         cd $GITHUB_WORKSPACE
-        ln -sf ~/workspace/critter-keeper ./critter-keeper
+        if ! ln -sf ~/workspace/critter-keeper ./critter-keeper; then
+          echo "❌ Failed to create symlink for critter-keeper"
+          exit 1
+        fi
         
         echo "✅ critter-keeper symlink created"
         
         echo "📂 Verifying symlink target exists:"
-        ls -la ./critter-keeper/
+        if ! ls -la ./critter-keeper/; then
+          echo "❌ Symlink target directory is not accessible"
+          exit 1
+        fi
+        
         echo "📂 Testing Cargo.toml accessibility:"
-        test -f ./critter-keeper/Cargo.toml && echo "✅ Cargo.toml found" || echo "❌ Cargo.toml missing"
+        if ! test -f ./critter-keeper/Cargo.toml; then
+          echo "❌ Cargo.toml not found - critter-keeper dependency will fail"
+          exit 1
+        fi
+        echo "✅ Cargo.toml found and accessible"
         
         echo "📂 Working directory is: $(pwd)"
         echo "📂 Full path to critter-keeper: $(readlink -f ./critter-keeper)"
@@ -112,17 +130,50 @@ jobs:
       run: pnpm run lint
       
     - name: Run type checking
-      run: pnpm exec vue-tsc --noEmit || echo "Type checking completed with warnings"
+      run: |
+        echo "🔍 Running TypeScript type checking..."
+        if ! pnpm exec vue-tsc --noEmit; then
+          echo "❌ Type checking failed - please fix TypeScript errors before merging"
+          # Allow type checking to fail in CI for now, but make it visible
+          echo "::warning::TypeScript type checking failed"
+        else
+          echo "✅ Type checking passed"
+        fi
       
     - name: Run tests
-      run: pnpm test || echo "Tests completed"
+      run: |
+        echo "🧪 Running test suite..."
+        if ! pnpm test; then
+          echo "❌ Tests failed - please fix failing tests before merging"
+          # Allow tests to fail in CI for now, but make it visible
+          echo "::warning::Test suite failed"
+        else
+          echo "✅ All tests passed"
+        fi
       
     - name: Test WASM integration
       run: |
-        # Verify WASM files were generated
-        ls -la public/game-engine/ || ls -la src/types/wasm/
-        test -f public/game-engine/app4dog_game_engine.js || test -f src/types/wasm/app4dog_game_engine.js
-        test -f public/game-engine/app4dog_game_engine_bg.wasm || test -f src/types/wasm/app4dog_game_engine_bg.wasm
+        echo "🔍 Verifying WASM files were generated..."
+        WASM_FOUND=false
+        
+        # Check primary location (src/types/wasm/) first
+        if [ -f "src/types/wasm/app4dog_game_engine.js" ] && [ -f "src/types/wasm/app4dog_game_engine_bg.wasm" ]; then
+          echo "✅ WASM files found in src/types/wasm/"
+          ls -la src/types/wasm/
+          WASM_FOUND=true
+        # Check fallback location (public/game-engine/)
+        elif [ -f "public/game-engine/app4dog_game_engine.js" ] && [ -f "public/game-engine/app4dog_game_engine_bg.wasm" ]; then
+          echo "✅ WASM files found in public/game-engine/"
+          ls -la public/game-engine/
+          WASM_FOUND=true
+        fi
+        
+        if [ "$WASM_FOUND" = "false" ]; then
+          echo "❌ WASM files not found in expected locations"
+          echo "Checking for any WASM files..."
+          find . -name "*.wasm" -o -name "*game_engine*.js" | head -10
+          exit 1
+        fi
         
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
@@ -136,9 +187,9 @@ jobs:
       with:
         name: wasm-build
         path: |
-          public/game-engine/
           src/types/wasm/
         retention-days: 7
+        if-no-files-found: error
 
   build-docker:
     needs: build-and-test
@@ -164,9 +215,29 @@ jobs:
           
       - name: Copy WASM artifacts to expected locations
         run: |
+          echo "📦 Copying WASM artifacts for Docker build..."
           mkdir -p public/game-engine/
-          cp -r artifacts/public/game-engine/* public/game-engine/ 2>/dev/null || true
-          cp -r artifacts/src/types/wasm/* public/game-engine/ 2>/dev/null || true
+          
+          # Copy WASM files from artifacts
+          if [ -d "artifacts/src/types/wasm" ]; then
+            echo "📁 Copying from artifacts/src/types/wasm/"
+            cp -r artifacts/src/types/wasm/* public/game-engine/
+          else
+            echo "❌ WASM artifacts not found in expected location"
+            echo "Available artifact contents:"
+            find artifacts/ -type f | head -10
+            exit 1
+          fi
+          
+          # Verify required WASM files are present
+          if [ ! -f "public/game-engine/app4dog_game_engine.js" ] || [ ! -f "public/game-engine/app4dog_game_engine_bg.wasm" ]; then
+            echo "❌ Required WASM files missing after copy"
+            echo "Contents of public/game-engine/:"
+            ls -la public/game-engine/
+            exit 1
+          fi
+          
+          echo "✅ WASM files successfully prepared for Docker build"
           
       - name: Log in to Container Registry
         uses: docker/login-action@v3
