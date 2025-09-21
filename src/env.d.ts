@@ -1,5 +1,10 @@
 /// <reference types="vite/client" />
 
+// Fix for Quasar TypeScript exports resolution issue
+declare module 'quasar' {
+  export * from 'quasar/dist/types/index';
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 declare namespace NodeJS {
   interface ProcessEnv {
