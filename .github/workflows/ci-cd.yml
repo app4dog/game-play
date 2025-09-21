@@ -42,7 +42,7 @@ jobs:
         git sparse-checkout set critter-keeper
         
         echo "📁 Creating symlink for critter-keeper" 
-        ln -sf ~/workspace/critter-keeper /home/runner/work/critter-keeper
+        ln -sf ~/workspace/critter-keeper /home/runner/work/game-play/critter-keeper
         
         echo "✅ critter-keeper symlink created"
       
