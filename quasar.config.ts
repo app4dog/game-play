@@ -179,14 +179,14 @@ export default defineConfig((ctx) => {
       },
       open: false, // don't open browser window automatically
       host: 'play.app4.dog',
-      port: 9000,
+      port: 4435,
       // Restrict dev server to approved hostnames only
       server: {
         allowedHosts: ['play.app4.dog', 'localhost'],
       },
       // CORS configuration for cross-origin requests
       cors: {
-        origin: ['https://play.app4.dog:9000', 'https://play.app4.dog:9001'],
+        origin: ['https://play.app4.dog:4435', 'https://play.app4.dog:8443'],
         credentials: true,
       },
       // Headers for proper MIME type handling
