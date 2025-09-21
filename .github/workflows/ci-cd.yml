@@ -27,7 +27,7 @@ jobs:
         
     - name: Pull critter-keeper source from GHCR
       run: |
-        echo "🐳 Pulling critter-keeper source from ghcr.io/app4dog/critter-keeper:0.1.0"
+        echo "🐳 Pulling critter-keeper source from ghcr.io/app4dog/critter-keeper-oci:0.1.0"
         docker pull ghcr.io/app4dog/critter-keeper-oci:0.1.0
         
         echo "📦 Extracting critter-keeper source code to expected path"
