@@ -6,9 +6,13 @@ echo "🐳 Building App4.Dog Android APK using Docker..."
 # Create output directory
 mkdir -p ./android-build-output
 
-# Build the Docker image
+# First build the artifacts image
+echo "📦 Building artifacts image..."
+docker build -t app4dog-artifacts:latest ../artifacts
+
+# Build the Android build image  
 echo "📦 Building Android build image..."
-docker build -t app4dog-android-builder -f Dockerfile.android .
+docker build -t app4dog-artifacts:latest ../artifacts && docker build -t app4dog-android-builder -f Dockerfile.android .
 
 # Run the container to build APK
 echo "🔨 Building APK in Docker container..."
