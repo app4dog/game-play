@@ -45,9 +45,6 @@ jobs:
         ln -sf ~/workspace/critter-keeper /home/runner/work/game-play/critter-keeper
         
         echo "✅ critter-keeper symlink created"
-        echo "📂 Final ../critter-keeper contents:"
-        ls -la ../critter-keeper/
-        test -f ../critter-keeper/Cargo.toml || (echo "❌ critter-keeper/Cargo.toml not found" && exit 1)
       
     - name: Setup pnpm
       uses: pnpm/action-setup@v2
