@@ -41,8 +41,20 @@ jobs:
         cd ../workspace
         git sparse-checkout set critter-keeper
         
+        echo "📂 Contents of workspace after sparse checkout:"
+        ls -la
+        
         echo "📁 Moving critter-keeper source to expected location"
-        mv critter-keeper ../critter-keeper
+        if [ -d "critter-keeper" ]; then
+          mv critter-keeper ../critter-keeper
+          echo "✅ Successfully moved critter-keeper directory"
+        else
+          echo "❌ critter-keeper directory not found in workspace"
+          echo "Available directories:"
+          ls -la
+          exit 1
+        fi
+        
         cd ..
         rm -rf workspace
         
