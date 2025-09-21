@@ -30,7 +30,7 @@ jobs:
       uses: actions/create-github-app-token@v1
       with:
         app-id: ${{ secrets.GH_APP_ID }}
-        private-key: ${{ secrets.GH_APP_SECRET }}
+        private-key: ${{ secrets.GH_APP_PRIVATEKEY }}
         owner: app4dog
         repositories: workspace
 
