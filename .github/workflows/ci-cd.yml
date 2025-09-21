@@ -42,9 +42,17 @@ jobs:
         git sparse-checkout set critter-keeper
         
         echo "📁 Creating symlink for critter-keeper" 
-        ln -sf ~/workspace/critter-keeper /home/runner/work/game-play/critter-keeper
+        ln -sf ~/workspace/critter-keeper ./critter-keeper
         
         echo "✅ critter-keeper symlink created"
+        
+        echo "📂 Verifying symlink target exists:"
+        ls -la ./critter-keeper/
+        echo "📂 Testing Cargo.toml accessibility:"
+        test -f ./critter-keeper/Cargo.toml && echo "✅ Cargo.toml found" || echo "❌ Cargo.toml missing"
+        
+        echo "📂 Working directory is: $(pwd)"
+        echo "📂 Full path to critter-keeper: $(readlink -f ./critter-keeper)"
       
     - name: Setup pnpm
       uses: pnpm/action-setup@v2

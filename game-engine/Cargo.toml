@@ -55,7 +55,7 @@ wasm-bindgen-futures = "0.4"
 regex-lite = "0.1"
 thiserror = "1.0"
 # Local critter-keeper crate - optional for CI builds  
-critter-keeper = { path = "../../critter-keeper", default-features = false, features = ["bevy"], optional = true }
+critter-keeper = { path = "../critter-keeper", default-features = false, features = ["bevy"], optional = true }
 # Force older ahash version that uses getrandom 0.2
 ahash = "0.7"
 # Explicit getrandom with wasm support

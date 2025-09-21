@@ -54,10 +54,11 @@ else
     BUILD_FLAGS="--dev"
 fi
 
-# Add custom features if specified
+# Add custom features if specified - separate wasm-pack and cargo flags
+CARGO_FEATURES=""
 if [ -n "$WASM_FEATURES" ]; then
     echo "🎛️ Using custom features: $WASM_FEATURES"
-    BUILD_FLAGS="$BUILD_FLAGS $WASM_FEATURES"
+    CARGO_FEATURES="$WASM_FEATURES"
 fi
 
 if [ "$HAS_WASM_PACK" = "1" ]; then
@@ -65,28 +66,37 @@ if [ "$HAS_WASM_PACK" = "1" ]; then
     set +e
     if command -v wasm-pack &> /dev/null; then
         # Output to src/types for TS consumption AND ensure public assets for CI/artifacts
-        wasm-pack build -vv --target web --out-dir ../src/types/wasm $BUILD_FLAGS
+        # Pass cargo features via -- separator to wasm-pack
+        if [ -n "$CARGO_FEATURES" ]; then
+            wasm-pack build --target web --out-dir ../src/types/wasm $BUILD_FLAGS -- $CARGO_FEATURES
+        else
+            wasm-pack build --target web --out-dir ../src/types/wasm $BUILD_FLAGS
+        fi
     else
         # Output to src/types for TS consumption AND ensure public assets for CI/artifacts
-        ~/.cargo/bin/wasm-pack build -vv --target web --out-dir ../src/types/wasm $BUILD_FLAGS
+        if [ -n "$CARGO_FEATURES" ]; then
+            ~/.cargo/bin/wasm-pack build --target web --out-dir ../src/types/wasm $BUILD_FLAGS -- $CARGO_FEATURES
+        else
+            ~/.cargo/bin/wasm-pack build --target web --out-dir ../src/types/wasm $BUILD_FLAGS
+        fi
     fi
     STATUS=$?
     set -e
     if [ $STATUS -ne 0 ]; then
         echo "⚠️ wasm-pack failed (likely missing wasm-bindgen or perms). Falling back to cargo build."
         if [ "$MODE" = "release" ]; then
-            cargo build -vv --no-default-features --lib --target wasm32-unknown-unknown --release
+            cargo build -vv --lib --target wasm32-unknown-unknown --release $CARGO_FEATURES
         else
-            cargo build -vv --no-default-features --lib --target wasm32-unknown-unknown
+            cargo build -vv --lib --target wasm32-unknown-unknown $CARGO_FEATURES
         fi
         echo "ℹ️ wasm-bindgen/JS glue not generated (install wasm-bindgen and rerun wasm-pack)."
     fi
 else
     echo "🔧 Running plain cargo build for wasm32-unknown-unknown (no packaging)"
     if [ "$MODE" = "release" ]; then
-        cargo build -vv --no-default-features --lib --target wasm32-unknown-unknown --release
+        cargo build -vv --lib --target wasm32-unknown-unknown --release $CARGO_FEATURES
     else
-        cargo build -vv --no-default-features --lib --target wasm32-unknown-unknown
+        cargo build -vv --lib --target wasm32-unknown-unknown $CARGO_FEATURES
     fi
     echo "ℹ️ wasm-bindgen/JS glue not generated (install wasm-pack to package for web)."
 fi
