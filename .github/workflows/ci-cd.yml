@@ -94,7 +94,7 @@ jobs:
       run: pnpm install
       
     - name: Build WASM game engine
-      run: WASM_FEATURES="--no-default-features --features camera_sprite_preview" just build-wasm
+      run: WASM_FEATURES="--no-default-features --features camera_sprite_preview,critter-keeper" just build-wasm
       
     - name: Build Quasar app
       run: pnpm run build
