@@ -25,43 +25,19 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
         
-    - name: Install oras
+    - name: Clone critter-keeper directory from workspace
       run: |
-        echo "📦 Installing oras for OCI artifact handling"
-        curl -LO "https://github.com/oras-project/oras/releases/download/v1.2.0/oras_1.2.0_linux_amd64.tar.gz"
-        mkdir -p oras-install/
-        tar -zxf oras_*.tar.gz -C oras-install/
-        sudo mv oras-install/oras /usr/local/bin/
-        rm -rf oras_*.tar.gz oras-install/
-        oras version
-    
-    - name: Pull critter-keeper source from OCI artifact
-      run: |
-        echo "🐳 Pulling critter-keeper source OCI artifact from ghcr.io/app4dog/critter-keeper-oci:0.1.0"
+        echo "📂 Cloning only critter-keeper directory from workspace repository"
+        git clone --filter=blob:none --sparse https://github.com/app4dog/workspace.git ../workspace
+        cd ../workspace
+        git sparse-checkout set critter-keeper
         
-        # Create temporary directory for extraction
-        mkdir -p temp-critter-extract
+        echo "📁 Moving critter-keeper source to expected location"
+        mv critter-keeper ../critter-keeper
+        cd ..
+        rm -rf workspace
         
-        # Use oras to pull OCI artifact containing source code
-        oras pull ghcr.io/app4dog/critter-keeper-oci:0.1.0 --output temp-critter-extract
-        
-        echo "📂 Contents of extracted OCI artifact:"
-        ls -la temp-critter-extract/
-        
-        # Handle nested structure - move critter-keeper source to expected location
-        if [ -d "temp-critter-extract/critter-keeper" ]; then
-          echo "✅ Found nested critter-keeper directory, moving to ../critter-keeper"
-          mv temp-critter-extract/critter-keeper ../critter-keeper
-        else
-          echo "⚠️ No nested directory found, moving all contents to ../critter-keeper"
-          mkdir -p ../critter-keeper
-          mv temp-critter-extract/* ../critter-keeper/
-        fi
-        
-        # Clean up temporary directory
-        rm -rf temp-critter-extract
-        
-        echo "✅ critter-keeper source extracted and moved to correct location"
+        echo "✅ critter-keeper source extracted via sparse checkout"
         echo "📂 Final ../critter-keeper contents:"
         ls -la ../critter-keeper/
         test -f ../critter-keeper/Cargo.toml || (echo "❌ critter-keeper/Cargo.toml not found" && exit 1)
