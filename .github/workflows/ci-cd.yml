@@ -39,13 +39,30 @@ jobs:
       run: |
         echo "🐳 Pulling critter-keeper source OCI artifact from ghcr.io/app4dog/critter-keeper-oci:0.1.0"
         
-        # Create directory for extraction
-        mkdir -p ../critter-keeper
+        # Create temporary directory for extraction
+        mkdir -p temp-critter-extract
         
         # Use oras to pull OCI artifact containing source code
-        oras pull ghcr.io/app4dog/critter-keeper-oci:0.1.0 --output ../critter-keeper
+        oras pull ghcr.io/app4dog/critter-keeper-oci:0.1.0 --output temp-critter-extract
         
-        echo "✅ critter-keeper source extracted"
+        echo "📂 Contents of extracted OCI artifact:"
+        ls -la temp-critter-extract/
+        
+        # Handle nested structure - move critter-keeper source to expected location
+        if [ -d "temp-critter-extract/critter-keeper" ]; then
+          echo "✅ Found nested critter-keeper directory, moving to ../critter-keeper"
+          mv temp-critter-extract/critter-keeper ../critter-keeper
+        else
+          echo "⚠️ No nested directory found, moving all contents to ../critter-keeper"
+          mkdir -p ../critter-keeper
+          mv temp-critter-extract/* ../critter-keeper/
+        fi
+        
+        # Clean up temporary directory
+        rm -rf temp-critter-extract
+        
+        echo "✅ critter-keeper source extracted and moved to correct location"
+        echo "📂 Final ../critter-keeper contents:"
         ls -la ../critter-keeper/
         test -f ../critter-keeper/Cargo.toml || (echo "❌ critter-keeper/Cargo.toml not found" && exit 1)
       
