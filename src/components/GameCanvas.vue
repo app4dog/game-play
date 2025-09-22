@@ -32,8 +32,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import type { Ref } from 'vue'
-// 🤓 Import auto-generated WASM types directly
-import type { GameEngine as WasmGameEngine } from '../types/wasm/app4dog_game_engine'
+// 🤓 Import WASM types from clean re-export
+import type { GameEngine as WasmGameEngine } from '../types/wasm-types'
 
 // GameEngineApi now imported from unified types
 
