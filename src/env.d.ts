@@ -2,12 +2,23 @@
 
 // Fix for Quasar TypeScript exports resolution issue in CI builds
 declare module 'quasar' {
+  // Import all Quasar types and exports
+  export * from 'quasar/dist/types/index';
+  // Specific exports that are commonly used
+  export { useQuasar } from 'quasar/dist/types/composables/use-quasar';
+  export { Notify } from 'quasar/dist/types/plugins/notify';
+}
+
+// Additional fix for specific Quasar dist files that CI builds reference
+declare module 'quasar/dist/quasar.client.js' {
   export * from 'quasar/dist/types/index';
 }
 
-// Additional fix for specific Quasar components and composables 
-declare module 'quasar/dist/quasar.client.js' {
-  export * from 'quasar/dist/types/index';
+// Fallback for any unresolved Quasar modules
+declare module 'quasar/*' {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const content: any;
+  export = content;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
