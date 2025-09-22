@@ -1,7 +1,12 @@
 /// <reference types="vite/client" />
 
-// Fix for Quasar TypeScript exports resolution issue
+// Fix for Quasar TypeScript exports resolution issue in CI builds
 declare module 'quasar' {
+  export * from 'quasar/dist/types/index';
+}
+
+// Additional fix for specific Quasar components and composables 
+declare module 'quasar/dist/quasar.client.js' {
   export * from 'quasar/dist/types/index';
 }
 
