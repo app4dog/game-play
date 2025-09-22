@@ -40,6 +40,10 @@ declare global {
     send_audio_response?: (responseJson: string) => void
     send_audio_response_to_bevy?: (responseJson: string) => void
     
+    // Critter management functions (for CritterSelection component)
+    critters_ready?: () => boolean
+    get_available_critters?: () => unknown[]
+    
     // Other WASM exports - allow any additional functions
     [key: string]: unknown
   }
@@ -49,6 +53,8 @@ declare global {
     webkitAudioContext?: typeof AudioContext
     // Global kill-switch to disable background music regardless of settings
     __A4D_DISABLE_BGM__?: boolean
+    // Global kill-switch to disable all audio (AudioContext) regardless of settings
+    __A4D_DISABLE_AUDIO__?: boolean
   }
 }
 

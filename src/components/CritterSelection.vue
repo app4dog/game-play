@@ -169,7 +169,7 @@ onMounted(async () => {
     }
     await waitUntil(() => !!mod.critters_ready && !!mod.critters_ready())
 
-    const list: WasmCritter[] = mod.get_available_critters?.() ?? []
+    const list: WasmCritter[] = (mod.get_available_critters?.() ?? []) as WasmCritter[]
     availableCritters.value = list.map((c) => ({
       id: c.id,
       name: c.name,

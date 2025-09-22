@@ -106,7 +106,7 @@ export default defineConfig((ctx) => {
         [
           'vite-plugin-checker',
           {
-            vueTsc: true,
+            vueTsc: true, // Re-enabled after dependency updates
             eslint: {
               lintCommand: 'eslint -c ./eslint.config.js "./src*/**/*.{ts,js,mjs,cjs,vue}"',
               useFlatConfig: true,
@@ -184,18 +184,11 @@ export default defineConfig((ctx) => {
       server: {
         allowedHosts: ['play.app4.dog', 'localhost'],
       },
-      // CORS configuration for cross-origin requests
-      cors: {
-        origin: ['https://play.app4.dog:4435', 'https://play.app4.dog:8443'],
-        credentials: true,
-      },
-      // Headers for proper MIME type handling
+      // Let nginx handle CORS headers to avoid duplication
+      // Headers for proper MIME type handling (non-CORS headers only)
       headers: {
-        'Access-Control-Allow-Origin': '*',
         'Cross-Origin-Embedder-Policy': 'credentialless',
-        'Cross-Origin-Opener-Policy': 'same-origin',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        'Cross-Origin-Opener-Policy': 'same-origin'
       }
     },
 

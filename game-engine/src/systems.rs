@@ -274,10 +274,10 @@ pub fn load_game_assets(
     console_log!("🎨 Starting asset loading with HTTPS URLs...");
     
     // Use HTTPS URLs with WebAssetPlugin configured properly
-    asset_collection.bird_sprite = asset_server.load("https://play.app4.dog:9000/assets/sprites/bird-animation.png");
+    asset_collection.bird_sprite = asset_server.load("https://play.app4.dog/assets/sprites/bird-animation.png");
     console_log!("🐦 Bird sprite handle created: {:?}", asset_collection.bird_sprite);
     
-    asset_collection.bunny_sprite = asset_server.load("https://play.app4.dog:9000/assets/sprites/bunny-sprite-sheet.png");  
+    asset_collection.bunny_sprite = asset_server.load("https://play.app4.dog/assets/sprites/bunny-sprite-sheet.png");  
     console_log!("🐰 Bunny sprite handle created: {:?}", asset_collection.bunny_sprite);
     
     // Load audio (prefer existing OGG in repo)

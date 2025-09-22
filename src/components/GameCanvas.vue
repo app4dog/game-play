@@ -64,14 +64,37 @@ let bgmGain: GainNode | null = null
 const initializeAudioContext = () => {
   if (audioContextInitialized.value || !wasmModule) return Promise.resolve()
   
+  // Check for global audio disable flag
+  if (window.__A4D_DISABLE_AUDIO__ === true) {
+    console.debug('🔇 Audio globally disabled via __A4D_DISABLE_AUDIO__')
+    audioContextInitialized.value = true // Mark as initialized to prevent retries
+    return Promise.resolve()
+  }
+  
   return new Promise<void>((resolve) => {
     try {
-      // Create or resume a Web Audio context for gapless BGM
+      // Only create AudioContext if we don't have one, and only during actual user interaction
       const Ctx = window.AudioContext || window.webkitAudioContext
       if (Ctx && !webAudioCtx) {
+        // Create a simple context that will be suspended initially
         webAudioCtx = new Ctx()
+        
+        // Ensure the context starts in a suspended state to comply with autoplay policy
+        if (webAudioCtx.state === 'running') {
+          console.debug('🎵 AudioContext created in running state, suspending to comply with autoplay policy')
+          void webAudioCtx.suspend()
+        }
       }
-      try { void webAudioCtx?.resume?.() } catch { /* ignore */ }
+      
+      // Resume the context - this should only succeed if called from a user gesture
+      if (webAudioCtx && webAudioCtx.state === 'suspended') {
+        webAudioCtx.resume().then(() => {
+          console.debug('🎵 AudioContext successfully resumed after user gesture')
+        }).catch((error) => {
+          console.warn('⚠️ AudioContext resume failed (expected if no user gesture):', error)
+        })
+      }
+      
       // Check if the WASM module has an audio context resume function
       const wasm = window.__A4D_WASM__
       if (wasm?.send_js_to_bevy_event) {
@@ -230,19 +253,68 @@ onMounted(async () => {
       // Expose game engine globally for camera debug panel and other components
       if (window.__A4D_WASM__) {
         try {
+          // Delete existing property if it exists to avoid redefinition errors
+          if ('game_engine' in window.__A4D_WASM__) {
+            delete window.__A4D_WASM__.game_engine
+          }
           Object.defineProperty(window.__A4D_WASM__, 'game_engine', {
             value: gameEngine,
             writable: true,
             configurable: true
           })
-        } catch (error) {
-          console.warn('Could not add game_engine to WASM module, creating new reference:', error)
-          // Fallback: create a new extensible object with the WASM module + game engine
-          const originalWasm = window.__A4D_WASM__
-          window.__A4D_WASM__ = {
-            ...originalWasm,
-            game_engine: gameEngine
+          
+          // Also expose the standalone critter functions for CritterSelection component
+          if (wasmModule.critters_ready) {
+            // Delete existing property if it exists to avoid redefinition errors
+            if ('critters_ready' in window.__A4D_WASM__) {
+              delete window.__A4D_WASM__.critters_ready
+            }
+            Object.defineProperty(window.__A4D_WASM__, 'critters_ready', {
+              value: wasmModule.critters_ready,
+              writable: true,
+              configurable: true
+            })
           }
+          if (wasmModule.get_available_critters) {
+            // Delete existing property if it exists to avoid redefinition errors
+            if ('get_available_critters' in window.__A4D_WASM__) {
+              delete window.__A4D_WASM__.get_available_critters
+            }
+            Object.defineProperty(window.__A4D_WASM__, 'get_available_critters', {
+              value: wasmModule.get_available_critters,
+              writable: true,
+              configurable: true
+            })
+          }
+        } catch (error) {
+          console.warn('Could not add properties to WASM module, creating new reference:', error)
+          // Fallback: create a new extensible object with the WASM module + game engine + functions
+          const originalWasm = window.__A4D_WASM__
+          const newWasmModule: UnifiedWasmModule = Object.create(null)
+          
+          // Copy enumerable properties safely
+          if (originalWasm) {
+            for (const key in originalWasm) {
+              if (key !== 'game_engine' && key !== 'critters_ready' && key !== 'get_available_critters') {
+                try {
+                  newWasmModule[key] = originalWasm[key]
+                } catch (copyError) {
+                  console.debug(`Skipping property ${key} during fallback copy:`, copyError)
+                }
+              }
+            }
+          }
+          
+          // Add our properties
+          newWasmModule.game_engine = gameEngine
+          if (wasmModule.critters_ready) {
+            newWasmModule.critters_ready = wasmModule.critters_ready
+          }
+          if (wasmModule.get_available_critters) {
+            newWasmModule.get_available_critters = wasmModule.get_available_critters
+          }
+          
+          window.__A4D_WASM__ = newWasmModule
         }
       }
     } else {
