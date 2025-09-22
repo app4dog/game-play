@@ -77,6 +77,22 @@ jobs:
         echo "📂 Working directory is: $(pwd)"
         echo "📂 Full path to critter-keeper: $(readlink -f ./critter-keeper)"
       
+    - name: Pull and setup artifacts from GHCR
+      run: |
+        echo "Logging into GHCR as ${{ github.actor }}"
+        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        echo "Pulling artifacts image..."
+        docker pull ghcr.io/app4dog/artifacts:latest
+        echo "Copying all artifacts to CI repo root..."
+        mkdir -p artifacts
+        docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/artifacts:/output" ghcr.io/app4dog/artifacts:latest sh -c "cp -r /artifacts/* /output/ && ls -la /output/"
+        echo "Updating critters symlink for CI (artifacts -> public/critters)"
+        mkdir -p public
+        cd public && rm -f critters && ln -s ../artifacts/critters critters && ls -la critters
+        cd ..
+        echo "Artifacts setup complete:"
+        ls -la artifacts/
+      
     - name: Setup pnpm
       uses: pnpm/action-setup@v2
       with:
