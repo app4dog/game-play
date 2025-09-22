@@ -84,6 +84,7 @@ jobs:
         echo "Pulling artifacts image..."
         docker pull ghcr.io/app4dog/artifacts:latest
         echo "Copying all artifacts to CI repo root..."
+        rm -rf artifacts
         mkdir -p artifacts
         docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/artifacts:/output" ghcr.io/app4dog/artifacts:latest sh -c "cp -r /artifacts/* /output/ && ls -la /output/"
         echo "Updating critters symlink for CI (artifacts -> public/critters)"
