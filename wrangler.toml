@@ -3,12 +3,12 @@
 
 # Live environment R2 bucket (main branch)
 [[r2_buckets]]
-bucket_name = "game-play-live"
+bucket_name = "gameplay-live"
 binding = "GAME_ASSETS"
-preview_bucket_name = "game-play-live"
+preview_bucket_name = "gameplay-live"
 
 # Staging environment R2 bucket (next branch)  
 [[r2_buckets]]
-bucket_name = "game-play-next"
+bucket_name = "gameplay-next"
 binding = "GAME_ASSETS_NEXT"
-preview_bucket_name = "game-play-next"
+preview_bucket_name = "gameplay-next"

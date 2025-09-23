@@ -9,7 +9,7 @@ SOURCE_DIR="${2:-dist/spa}"
 
 if [ -z "$BUCKET_NAME" ]; then
     echo "❌ Usage: $0 <bucket-name> [source-dir]"
-    echo "Example: $0 game-play-live dist/spa"
+    echo "Example: $0 gameplay-live dist/spa"
     exit 1
 fi
 
