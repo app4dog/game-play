@@ -264,12 +264,19 @@ jobs:
             BUCKET="gameplay-next"
           fi
           echo "Verifying R2 bucket: ${BUCKET}"
-          # List buckets and ensure target exists
-          if ! wrangler r2 bucket list --json | jq -e --arg b "$BUCKET" '.[] | select(.name == $b)' >/dev/null; then
-            echo "::error::R2 bucket '$BUCKET' not found in account ${CLOUDFLARE_ACCOUNT_ID}"
-            exit 1
+          # List buckets and ensure target exists (prefer JSON, fallback to text)
+          if wrangler r2 bucket list --account-id "$CLOUDFLARE_ACCOUNT_ID" --output json >/tmp/r2_buckets.json 2>/dev/null && \
+             jq -e --arg b "$BUCKET" '.[] | select(.name == $b)' /tmp/r2_buckets.json >/dev/null; then
+            echo "✅ R2 bucket '$BUCKET' exists"
+          else
+            # Fallback to text parsing if JSON not supported
+            if wrangler r2 bucket list --account-id "$CLOUDFLARE_ACCOUNT_ID" 2>/dev/null | grep -q "\b$BUCKET\b"; then
+              echo "✅ R2 bucket '$BUCKET' exists (text mode)"
+            else
+              echo "::error::R2 bucket '$BUCKET' not found in account ${CLOUDFLARE_ACCOUNT_ID}"
+              exit 1
+            fi
           fi
-          echo "✅ R2 bucket '$BUCKET' exists"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
