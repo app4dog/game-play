@@ -227,80 +227,6 @@ jobs:
         retention-days: 7
         if-no-files-found: error
 
-  build-docker:
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-          
-      - name: Download WASM artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: wasm-build
-          path: artifacts/
-          
-      - name: Copy WASM artifacts to expected locations
-        run: |
-          echo "📦 Copying WASM artifacts for Docker build..."
-          mkdir -p public/game-engine/
-          
-          # Copy WASM files from artifacts
-          if [ -d "artifacts/src/types/wasm" ]; then
-            echo "📁 Copying from artifacts/src/types/wasm/"
-            cp -r artifacts/src/types/wasm/* public/game-engine/
-          else
-            echo "❌ WASM artifacts not found in expected location"
-            echo "Available artifact contents:"
-            find artifacts/ -type f | head -10
-            exit 1
-          fi
-          
-          # Verify required WASM files are present
-          if [ ! -f "public/game-engine/app4dog_game_engine.js" ] || [ ! -f "public/game-engine/app4dog_game_engine_bg.wasm" ]; then
-            echo "❌ Required WASM files missing after copy"
-            echo "Contents of public/game-engine/:"
-            ls -la public/game-engine/
-            exit 1
-          fi
-          
-          echo "✅ WASM files successfully prepared for Docker build"
-          
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-            
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
   deploy-cloudflare:
     needs: build-and-test
     runs-on: ubuntu-latest
@@ -323,20 +249,34 @@ jobs:
       - name: Install wrangler
         run: npm install -g wrangler
         
-      - name: Deploy to Cloudflare (Live - main branch)
+      - name: Deploy to Cloudflare R2 (Live - main branch)
         if: github.ref == 'refs/heads/main'
         run: |
-          # Deploy to live environment
-          wrangler deploy --env live
+          echo "🚀 Deploying to R2 live bucket..."
+          # Sync entire dist/spa directory to R2 bucket
+          cd dist/spa
+          find . -type f -name "*.wasm" -exec wrangler r2 object put game-play-live/{} --file={} --content-type=application/wasm \;
+          find . -type f -name "*.js" -exec wrangler r2 object put game-play-live/{} --file={} --content-type=application/javascript \;
+          find . -type f -name "*.html" -exec wrangler r2 object put game-play-live/{} --file={} --content-type=text/html \;
+          find . -type f -name "*.css" -exec wrangler r2 object put game-play-live/{} --file={} --content-type=text/css \;
+          find . -type f \! -name "*.wasm" \! -name "*.js" \! -name "*.html" \! -name "*.css" -exec wrangler r2 object put game-play-live/{} --file={} \;
+          echo "✅ Live deployment complete"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           
-      - name: Deploy to Cloudflare (Next - next branch)
+      - name: Deploy to Cloudflare R2 (Next - next branch)
         if: github.ref == 'refs/heads/next'
         run: |
-          # Deploy to next environment
-          wrangler deploy --env next
+          echo "🚀 Deploying to R2 next bucket..."
+          # Sync entire dist/spa directory to R2 bucket
+          cd dist/spa
+          find . -type f -name "*.wasm" -exec wrangler r2 object put game-play-next/{} --file={} --content-type=application/wasm \;
+          find . -type f -name "*.js" -exec wrangler r2 object put game-play-next/{} --file={} --content-type=application/javascript \;
+          find . -type f -name "*.html" -exec wrangler r2 object put game-play-next/{} --file={} --content-type=text/html \;
+          find . -type f -name "*.css" -exec wrangler r2 object put game-play-next/{} --file={} --content-type=text/css \;
+          find . -type f \! -name "*.wasm" \! -name "*.js" \! -name "*.html" \! -name "*.css" -exec wrangler r2 object put game-play-next/{} --file={} \;
+          echo "✅ Next deployment complete"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}

@@ -1,33 +1,14 @@
-# Cloudflare configuration for app4.dog game-play
-name = 'game-play-app4dog'
+# Cloudflare R2 configuration for app4.dog game-play
+# Static site deployment using R2 bucket + custom domain
 
-compatibility_date = "2024-09-06"
-workers_dev = false # Disable *.workers.dev for custom domains by default
+# Live environment R2 bucket (main branch)
+[[r2_buckets]]
+bucket_name = "game-play-live"
+binding = "GAME_ASSETS"
+preview_bucket_name = "game-play-live"
 
-# Assets configuration for serving static assets (Quasar SPA output)
-[assets]
-directory = "dist/spa" # Quasar build output
-not_found_handling = "single-page-application" # Important for SPAs
-
-# Headers for CORS and game functionality
-[[headers]]
-for = "/*"
-[headers.values]
-"Cross-Origin-Opener-Policy" = "same-origin-allow-popups"
-"Cross-Origin-Embedder-Policy" = "require-corp"
-
-# Live environment (main branch)
-[env.live]
-name = "game-play-app4dog"
-vars = { ENVIRONMENT = "live", APP_URL = "https://play.app4.dog", BASE_URL = "https://play.app4.dog" }
-routes = [
-  { pattern = "play.app4.dog/*", zone_id = "2148505d0548b15535dba6b8c1e4972d" }
-]
-
-# Next environment (next branch)
-[env.next]
-name = "game-play-app4dog-next"
-vars = { ENVIRONMENT = "next", APP_URL = "https://next.play.app4.dog", BASE_URL = "https://next.play.app4.dog" }
-routes = [
-  { pattern = "next.play.app4.dog/*", zone_id = "2148505d0548b15535dba6b8c1e4972d" }
-]
+# Staging environment R2 bucket (next branch)  
+[[r2_buckets]]
+bucket_name = "game-play-next"
+binding = "GAME_ASSETS_NEXT"
+preview_bucket_name = "game-play-next"
