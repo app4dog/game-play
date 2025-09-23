@@ -251,32 +251,14 @@ jobs:
         
       - name: Deploy to Cloudflare R2 (Live - main branch)
         if: github.ref == 'refs/heads/main'
-        run: |
-          echo "🚀 Deploying to R2 live bucket..."
-          # Sync entire dist/spa directory to R2 bucket
-          cd dist/spa
-          find . -type f -name "*.wasm" -exec wrangler r2 object put game-play-live/{} --file={} --content-type=application/wasm \;
-          find . -type f -name "*.js" -exec wrangler r2 object put game-play-live/{} --file={} --content-type=application/javascript \;
-          find . -type f -name "*.html" -exec wrangler r2 object put game-play-live/{} --file={} --content-type=text/html \;
-          find . -type f -name "*.css" -exec wrangler r2 object put game-play-live/{} --file={} --content-type=text/css \;
-          find . -type f \! -name "*.wasm" \! -name "*.js" \! -name "*.html" \! -name "*.css" -exec wrangler r2 object put game-play-live/{} --file={} \;
-          echo "✅ Live deployment complete"
+        run: ./scripts/r2-sync.sh game-play-live dist/spa
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           
       - name: Deploy to Cloudflare R2 (Next - next branch)
         if: github.ref == 'refs/heads/next'
-        run: |
-          echo "🚀 Deploying to R2 next bucket..."
-          # Sync entire dist/spa directory to R2 bucket
-          cd dist/spa
-          find . -type f -name "*.wasm" -exec wrangler r2 object put game-play-next/{} --file={} --content-type=application/wasm \;
-          find . -type f -name "*.js" -exec wrangler r2 object put game-play-next/{} --file={} --content-type=application/javascript \;
-          find . -type f -name "*.html" -exec wrangler r2 object put game-play-next/{} --file={} --content-type=text/html \;
-          find . -type f -name "*.css" -exec wrangler r2 object put game-play-next/{} --file={} --content-type=text/css \;
-          find . -type f \! -name "*.wasm" \! -name "*.js" \! -name "*.html" \! -name "*.css" -exec wrangler r2 object put game-play-next/{} --file={} \;
-          echo "✅ Next deployment complete"
+        run: ./scripts/r2-sync.sh game-play-next dist/spa
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
