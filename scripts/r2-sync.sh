@@ -20,6 +20,16 @@ fi
 
 echo "🚀 Syncing '$SOURCE_DIR' to R2 bucket '$BUCKET_NAME'..."
 
+# Ensure required env vars for wrangler are present
+if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+    echo "❌ CLOUDFLARE_API_TOKEN is not set. Add CF_API_TOKEN secret in CI."
+    exit 1
+fi
+if [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+    echo "❌ CLOUDFLARE_ACCOUNT_ID is not set. Add CF_ACCOUNT_ID secret in CI."
+    exit 1
+fi
+
 # Content type mappings (comprehensive list)
 declare -A CONTENT_TYPES=(
     ["wasm"]="application/wasm"
@@ -56,11 +66,11 @@ declare -A CONTENT_TYPES=(
 )
 
 # Try using rclone if available (much faster and has true sync)
-if command -v rclone >/dev/null 2>&1; then
+if command -v rclone >/dev/null 2>&1 && [ -n "${CLOUDFLARE_ACCESS_KEY_ID:-}" ] && [ -n "${CLOUDFLARE_SECRET_ACCESS_KEY:-}" ]; then
     echo "📡 Using rclone for efficient sync..."
-    
+
     # Check if rclone remote exists, if not create it
-    if ! rclone listremotes | grep -q "r2:"; then
+    if ! rclone listremotes | grep -q "^r2:"; then
         echo "🔧 Configuring rclone for Cloudflare R2..."
         rclone config create r2 s3 \
             provider=Cloudflare \
@@ -68,7 +78,7 @@ if command -v rclone >/dev/null 2>&1; then
             secret_access_key="$CLOUDFLARE_SECRET_ACCESS_KEY" \
             endpoint="https://$CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com"
     fi
-    
+
     # Sync with rclone (much more efficient)
     rclone sync "$SOURCE_DIR" "r2:$BUCKET_NAME" \
         --progress \
@@ -76,7 +86,7 @@ if command -v rclone >/dev/null 2>&1; then
         --checksum \
         --transfers=10 \
         --checkers=20
-    
+
     echo "✅ Rclone sync complete"
     exit 0
 fi
@@ -84,13 +94,34 @@ fi
 # Fallback to wrangler (slower but works without additional setup)
 echo "📡 Using wrangler for sync (install rclone for faster syncing)..."
 
+# Ensure bucket exists (create if missing)
+echo "🪣 Ensuring R2 bucket '$BUCKET_NAME' exists..."
+set +e
+bucket_exists_json=$(wrangler r2 bucket list --account-id "$CLOUDFLARE_ACCOUNT_ID" --output json 2>/dev/null)
+if [ $? -ne 0 ] || ! echo "$bucket_exists_json" | jq -e '. | type == "array"' >/dev/null 2>&1; then
+  # Fallback to non-JSON list parsing if JSON output unsupported
+  bucket_list_text=$(wrangler r2 bucket list --account-id "$CLOUDFLARE_ACCOUNT_ID" 2>/dev/null || true)
+  echo "$bucket_list_text" | grep -q "\b$BUCKET_NAME\b"
+  exists=$?
+else
+  echo "$bucket_exists_json" | jq -r '.[].name' | grep -qx "$BUCKET_NAME"
+  exists=$?
+fi
+set -e
+if [ $exists -ne 0 ]; then
+  echo "🪣 Bucket not found. Creating '$BUCKET_NAME'..."
+  wrangler r2 bucket create "$BUCKET_NAME" --account-id "$CLOUDFLARE_ACCOUNT_ID"
+else
+  echo "✅ Bucket exists"
+fi
+
 # Change to source directory for relative paths
 cd "$SOURCE_DIR"
 
 # Get current bucket contents for cleanup
 echo "🗂️  Getting current bucket contents..."
 bucket_files=$(mktemp)
-wrangler r2 object list "$BUCKET_NAME" --output json 2>/dev/null | \
+wrangler r2 object list "$BUCKET_NAME" --account-id "$CLOUDFLARE_ACCOUNT_ID" --output json 2>/dev/null | \
     jq -r '.objects[]?.key // empty' > "$bucket_files" || touch "$bucket_files"
 
 # Get local files
@@ -114,7 +145,8 @@ while read -r file; do
     echo "📤 $file (${content_type})"
     wrangler r2 object put "$BUCKET_NAME/$file" \
         --file="$file" \
-        --content-type="$content_type"
+        --content-type="$content_type" \
+        --account-id "$CLOUDFLARE_ACCOUNT_ID"
 done < "$local_files"
 
 # Clean up orphaned files (files in bucket but not in local)
@@ -122,12 +154,16 @@ echo "🧹 Cleaning up orphaned files..."
 comm -23 <(sort "$bucket_files") "$local_files" | while read -r orphan; do
     [ -n "$orphan" ] || continue
     echo "🗑️  Removing: $orphan"
-    wrangler r2 object delete "$BUCKET_NAME/$orphan"
+    wrangler r2 object delete "$BUCKET_NAME/$orphan" --account-id "$CLOUDFLARE_ACCOUNT_ID"
 done
+
+# Capture stats before cleanup
+total_files=$(wc -l < "$local_files" || echo 0)
+total_size=$(du -sh . | cut -f1)
 
 # Cleanup temp files
 rm -f "$bucket_files" "$local_files"
 
 echo "✅ Sync complete to R2 bucket '$BUCKET_NAME'"
-echo "📊 Total files: $(wc -l < "$local_files")"
-echo "📦 Total size: $(du -sh . | cut -f1)"
+echo "📊 Total files: $total_files"
+echo "📦 Total size: $total_size"
