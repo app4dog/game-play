@@ -267,12 +267,12 @@ jobs:
           echo "CF_API_TOKEN ends with: ...${CLOUDFLARE_API_TOKEN: -4}"
           echo "CF_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}"
           # List buckets and ensure target exists (prefer JSON, fallback to text)
-          if wrangler r2 bucket list --account-id "$CLOUDFLARE_ACCOUNT_ID" --output json >/tmp/r2_buckets.json 2>/dev/null && \
+          if wrangler r2 bucket list --jurisdiction default --output json >/tmp/r2_buckets.json 2>/dev/null && \
              jq -e --arg b "$BUCKET" '.[] | select(.name == $b)' /tmp/r2_buckets.json >/dev/null; then
             echo "✅ R2 bucket '$BUCKET' exists"
           else
             # Fallback to text parsing if JSON not supported
-            if wrangler r2 bucket list --account-id "$CLOUDFLARE_ACCOUNT_ID" 2>/dev/null | grep -q "\b$BUCKET\b"; then
+            if wrangler r2 bucket list --jurisdiction default 2>/dev/null | grep -q "\b$BUCKET\b"; then
               echo "✅ R2 bucket '$BUCKET' exists (text mode)"
             else
               echo "::error::R2 bucket '$BUCKET' not found in account ${CLOUDFLARE_ACCOUNT_ID}"
