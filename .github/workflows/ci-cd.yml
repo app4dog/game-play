@@ -249,50 +249,23 @@ jobs:
         with:
           node-version: '20'
       
-      - name: Install jq (for r2-sync)
-        run: sudo apt-get update && sudo apt-get install -y jq
-          
-      - name: Install wrangler
-        run: npm install -g wrangler
-        
-      - name: Verify R2 bucket exists for branch
+      - name: Set R2 bucket name
+        id: bucket
         run: |
-          set -euo pipefail
           if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
-            BUCKET="gameplay-live"
+            echo "name=gameplay-live" >> $GITHUB_OUTPUT
           else
-            BUCKET="gameplay-next"
+            echo "name=gameplay-next" >> $GITHUB_OUTPUT
           fi
-          echo "Verifying R2 bucket: ${BUCKET}"
-          echo "CF_API_TOKEN ends with: ...${CLOUDFLARE_API_TOKEN: -4}"
-          echo "CF_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}"
-          # List buckets and ensure target exists (prefer JSON, fallback to text)
-          if wrangler r2 bucket list --jurisdiction default --output json >/tmp/r2_buckets.json 2>/dev/null && \
-             jq -e --arg b "$BUCKET" '.[] | select(.name == $b)' /tmp/r2_buckets.json >/dev/null; then
-            echo "✅ R2 bucket '$BUCKET' exists"
-          else
-            # Fallback to text parsing if JSON not supported
-            if wrangler r2 bucket list --jurisdiction default 2>/dev/null | grep -q "\b$BUCKET\b"; then
-              echo "✅ R2 bucket '$BUCKET' exists (text mode)"
-            else
-              echo "::error::R2 bucket '$BUCKET' not found in account ${CLOUDFLARE_ACCOUNT_ID}"
-              exit 1
-            fi
-          fi
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-        
-      - name: Deploy to Cloudflare R2 (Live - main branch)
-        if: github.ref == 'refs/heads/main'
-        run: ./scripts/r2-sync.sh gameplay-live dist/spa
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           
-      - name: Deploy to Cloudflare R2 (Next - next branch)
-        if: github.ref == 'refs/heads/next'
-        run: ./scripts/r2-sync.sh gameplay-next dist/spa
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      - name: Deploy to Cloudflare R2
+        uses: shallwefootball/r2-upload-action@v1.4.1
+        with:
+          source-dir: dist/spa
+          destination-dir: ''
+          r2-bucket: ${{ steps.bucket.outputs.name }}
+          r2-account-id: ${{ secrets.CF_ACCOUNT_ID }}
+          r2-access-key-id: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}
+          r2-secret-access-key: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+          r2-endpoint: ${{ secrets.CLOUDFLARE_R2_URL }}
+          output-file-url: false
