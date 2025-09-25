@@ -259,13 +259,11 @@ jobs:
           fi
           
       - name: Deploy to Cloudflare R2
-        uses: shallwefootball/r2-upload-action@v1.4.1
+        uses: ryand56/r2-upload-action@latest
         with:
-          source-dir: dist/spa
-          destination-dir: ''
-          r2-bucket: ${{ steps.bucket.outputs.name }}
           r2-account-id: ${{ secrets.CF_ACCOUNT_ID }}
           r2-access-key-id: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}
           r2-secret-access-key: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
-          r2-endpoint: ${{ secrets.CLOUDFLARE_R2_URL }}
-          output-file-url: false
+          r2-bucket: ${{ steps.bucket.outputs.name }}
+          source-dir: dist/spa
+          destination-dir: ./
