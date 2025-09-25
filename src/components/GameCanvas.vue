@@ -49,6 +49,7 @@ const emit = defineEmits<{
   gameError: [error: string]
   scoreChanged: [score: number]
   audioReady: []
+  loadingProgress: [progress: { loaded: number, total: number, phase: string }]
 }>()
 
 // Expose game engine for other components
@@ -244,9 +245,75 @@ onMounted(async () => {
       console.debug('[A4D][WASM] glue module loaded via dynamic script')
     }
     wasmModule = mod
-    console.debug('[A4D][WASM] initializing module default()')
+    
+    // Track WASM loading progress
+    console.debug('[A4D][WASM] initializing module default() with progress tracking')
+    emit('loadingProgress', { loaded: 0, total: 100, phase: 'Initializing WASM module...' })
+    
     if (wasmModule) {
-      await wasmModule.default() // Initialize WASM
+      // Create progress tracking wrapper for WASM initialization
+      const wasmUrl = selected.wasmUrl
+      
+      // Fetch WASM file with progress tracking
+      emit('loadingProgress', { loaded: 0, total: 100, phase: 'Downloading game engine...' })
+      
+      try {
+        const response = await fetch(wasmUrl)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch WASM: ${response.status}`)
+        }
+        
+        const contentLength = response.headers.get('content-length')
+        const total = contentLength ? parseInt(contentLength, 10) : 0
+        
+        if (total > 0) {
+          const reader = response.body?.getReader()
+          let loaded = 0
+          const chunks: Uint8Array[] = []
+          
+          if (reader) {
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              
+              chunks.push(value)
+              loaded += value.length
+              
+              const progressPercent = Math.round((loaded / total) * 100)
+              emit('loadingProgress', { 
+                loaded, 
+                total, 
+                phase: `Downloading game engine... ${progressPercent}% (${Math.round(loaded/1024/1024)}MB / ${Math.round(total/1024/1024)}MB)`
+              })
+            }
+            
+            // Combine chunks into single array
+            const wasmBytes = new Uint8Array(loaded)
+            let offset = 0
+            for (const chunk of chunks) {
+              wasmBytes.set(chunk, offset)
+              offset += chunk.length
+            }
+            
+            emit('loadingProgress', { loaded: total, total, phase: 'Initializing game engine...' })
+            
+            // Initialize WASM with the downloaded bytes
+            await wasmModule.default(wasmBytes)
+          } else {
+            // Fallback if streaming not supported
+            emit('loadingProgress', { loaded: 0, total: 100, phase: 'Downloading game engine...' })
+            await wasmModule.default(wasmUrl)
+          }
+        } else {
+          // Fallback if content-length not available
+          emit('loadingProgress', { loaded: 0, total: 100, phase: 'Downloading game engine...' })
+          await wasmModule.default(wasmUrl)
+        }
+      } catch (fetchError) {
+        console.warn('Progress tracking failed, falling back to standard loading:', fetchError)
+        emit('loadingProgress', { loaded: 0, total: 100, phase: 'Loading game engine...' })
+        await wasmModule.default() // Fallback to standard loading
+      }
       console.debug('[A4D][WASM] module initialized')
       
       gameEngine = new wasmModule.GameEngine()

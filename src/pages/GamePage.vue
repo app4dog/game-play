@@ -7,6 +7,7 @@
       @game-error="onGameError"
       @score-changed="onScoreChanged"
       @audio-ready="onAudioReady"
+      @loading-progress="onLoadingProgress"
       class="full-height"
     />
 
@@ -17,11 +18,24 @@
       </q-chip>
     </div>
     
-    <!-- Loading overlay -->
+    <!-- Loading overlay with progress -->
     <q-inner-loading :showing="gameLoading">
       <div class="game-loading">
         <q-spinner-puff color="primary" size="4em" />
         <p class="loading-text">🐕 Loading App4.Dog Game...</p>
+        <div v-if="loadingProgress" class="loading-progress">
+          <q-linear-progress 
+            :value="loadingProgress.total > 0 ? loadingProgress.loaded / loadingProgress.total : 0"
+            color="primary"
+            size="8px"
+            class="q-mb-sm"
+            stripe
+          />
+          <p class="progress-text">{{ loadingProgress.phase }}</p>
+          <p v-if="loadingProgress.total > 0" class="progress-size">
+            {{ Math.round(loadingProgress.loaded / 1024 / 1024) }}MB / {{ Math.round(loadingProgress.total / 1024 / 1024) }}MB
+          </p>
+        </div>
       </div>
     </q-inner-loading>
     
@@ -131,8 +145,8 @@
     <BluetoothDebugPanel />
   </q-dialog>
     
-    <!-- Game menu overlay -->
-    <q-dialog v-model="showMenu">
+    <!-- Game menu overlay (only show when not loading) -->
+    <q-dialog :model-value="showMenu && !gameLoading" @update:model-value="showMenu = $event">
       <q-card class="game-menu font-hero">
         <q-card-section class="text-center">
           <div class="text-h4">🐕 App4.Dog Game</div>
@@ -256,6 +270,7 @@ const gameLoading = ref(true)
 const gameError = ref<string | null>(null)
 const gameErrorDialog = ref(false)
 const showMenu = ref(true)
+const loadingProgress = ref<{ loaded: number, total: number, phase: string } | null>(null)
 const showCritterSelection = ref(false)
 const showSettings = ref(false)
 const showDebugPanel = ref(false)
@@ -308,6 +323,7 @@ const initializeGame = () => {
 }
 
 const onGameReady = () => {
+  loadingProgress.value = { loaded: 100, total: 100, phase: 'Game ready!' }
   gameLoading.value = false
   console.log('🎮 Game is ready to play!')
   // Sync current settings to engine
@@ -351,6 +367,11 @@ const onAudioReady = () => {
   if (bgmGloballyDisabled.value) {
     $q.notify({ type: 'warning', message: '🎼 BGM disabled globally', position: 'top', timeout: 1500 })
   }
+}
+
+const onLoadingProgress = (progress: { loaded: number, total: number, phase: string }) => {
+  loadingProgress.value = progress
+  console.log('🔄 Loading progress:', progress.phase, progress.loaded, '/', progress.total)
 }
 
 const startGame = async () => {
@@ -796,6 +817,26 @@ onMounted(() => {
   margin-top: 1rem;
   font-size: 1.2rem;
   color: $primary;
+}
+
+.loading-progress {
+  margin-top: 1.5rem;
+  width: 100%;
+  max-width: 400px;
+}
+
+.progress-text {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+  color: $primary;
+  opacity: 0.8;
+}
+
+.progress-size {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.8rem;
+  color: $primary;
+  opacity: 0.6;
 }
 
 .game-menu {

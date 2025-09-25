@@ -36,6 +36,8 @@ This is a hybrid web/native application combining:
 ### Mobile Development
 - `just dev-android` - Build WASM + sync + run on Android
 - `just build-android-docker` - Build Android APK using Docker (no local Android SDK)
+- `just install-apk` - Install built APK to connected Android device via ADB
+- `just deploy-android` - Full build + install + launch workflow
 - `just cap-sync` - Sync web assets to mobile platforms
 - `just cap-open-android` - Open Android Studio
 
@@ -45,9 +47,10 @@ This is a hybrid web/native application combining:
 - `pnpm run test` / `just test` - Run test suites
 
 ### Testing
-- Main tests in `tests/` directory with dedicated package.json
+- Main tests in `tests/` directory with dedicated package.json  
 - Test files: `critter-integration.test.js`, `grid-coordinates.test.js`, `critter-id-mapping.test.js`
 - Run with: `cd tests && npm install && npm test`
+- All tests verify the dynamic, extensible critter system (no hardcoded IDs)
 
 ## Key Architecture Details
 
@@ -115,11 +118,14 @@ just rebuild-wasm  # Clean + rebuild WASM
 ```bash
 just install       # Install all dependencies (Node.js + Rust tools)
 just dev-full      # Clean install + build WASM + start dev server
+just clean         # Clean build artifacts
+just clean-all     # Clean all dependencies and artifacts
 ```
 
 ### Mobile Development
 ```bash
 just dev-android    # Build + sync + run on Android device/emulator
+just adb-devices    # Check connected Android devices
 ```
 
 ## Project Structure
