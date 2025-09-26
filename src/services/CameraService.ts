@@ -14,8 +14,26 @@ type CameraPreviewPlugin = {
   start: (opts: { position: 'rear' | 'front'; toBack: boolean; width?: number; height?: number }) => Promise<void>
   stop: () => Promise<void>
   captureSample: (opts: { quality?: number }) => Promise<{ value?: string; data?: string }>
+  capture?: (opts: { quality?: number }) => Promise<{ value?: string }>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any // Allow for any additional methods
+}
+
+// Capacitor proxies throw if consumer probes `.then`; wrap to make it safe to return from async
+function wrapCapacitorProxy<T extends Record<string, unknown>>(plugin: T | null): T | null {
+  if (!plugin) return plugin
+  return new Proxy(plugin, {
+    get(target, prop, receiver) {
+      if (prop === 'then') return undefined
+      const value = Reflect.get(target, prop, receiver)
+      if (typeof value === 'function') {
+        return (...args: unknown[]) => {
+          return (value as (...fnArgs: unknown[]) => unknown).apply(target, args)
+        }
+      }
+      return value
+    },
+  })
 }
 
 // Runtime detection of Capacitor Camera Preview
@@ -33,7 +51,15 @@ async function loadCapacitorCameraPreview(): Promise<CameraPreviewPlugin | null>
   try {
     console.log('[CameraService] Attempting to load @capacitor-community/camera-preview...')
     // Dynamic import to avoid bundling when not present
-    const { CameraPreview } = await import('@capacitor-community/camera-preview')
+    const module = await import('@capacitor-community/camera-preview')
+    const rawPlugin = module.CameraPreview
+    const CameraPreview = wrapCapacitorProxy(rawPlugin)
+
+    if (!CameraPreview) {
+      console.warn('[CameraService] CameraPreview proxy missing after wrap')
+      return null
+    }
+
     console.log('[CameraService] Module loaded, plugin:', CameraPreview)
     
     // Log available methods - try multiple approaches for Proxy objects
@@ -42,9 +68,10 @@ async function loadCapacitorCameraPreview(): Promise<CameraPreviewPlugin | null>
     console.log('[CameraService] Has start:', 'start' in CameraPreview, typeof CameraPreview.start)
     console.log('[CameraService] Has stop:', 'stop' in CameraPreview, typeof CameraPreview.stop)
     console.log('[CameraService] Has captureSample:', 'captureSample' in CameraPreview, typeof CameraPreview.captureSample)
-    console.log('[CameraService] Has capture:', 'capture' in CameraPreview, typeof CameraPreview.capture)
+    const pluginRecord = CameraPreview as Record<string, unknown>
+    console.log('[CameraService] Has capture:', 'capture' in pluginRecord, typeof pluginRecord.capture)
     
-    if (CameraPreview && typeof CameraPreview.start === 'function') {
+    if (typeof CameraPreview.start === 'function') {
       console.log('[CameraService] Plugin validated successfully')
       return CameraPreview
     } else {
