@@ -82,7 +82,7 @@ export class BevyEventBridge {
     const { width = 640, height = 480 } = event
     try {
       const { cameraService } = await import('../services/CameraService')
-      await cameraService.start({ width, height, rear: true })
+      await cameraService.start({ width, height, zoom: 0.25 })
       console.log('📷 Camera started', { width, height })
     } catch (error) {
       console.error('❌ Failed to start camera:', error)

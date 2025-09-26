@@ -149,7 +149,7 @@
     <q-dialog :model-value="showMenu && !gameLoading" @update:model-value="showMenu = $event">
       <q-card class="game-menu font-hero">
         <q-card-section class="text-center">
-          <div class="text-h4">🐕 App4.Dog Game</div>
+          <div class="text-h4">🐕 App4.Dog</div>
           <div class="text-subtitle2">Interactive Pet Training</div>
         </q-card-section>
         
@@ -230,6 +230,8 @@
         @close="showSettings = false"
       />
     </q-dialog>
+
+    <TrainingModeOverlay v-if="showTrainingMode" @exit="onTrainingExit" />
   </q-page>
 </template>
 
@@ -241,6 +243,7 @@ import GameCanvas from '../components/GameCanvas.vue'
 import { useBevyEventBridge } from '../composables/useBevyEventBridge'
 import { useNativeAudio } from '../composables/useNativeAudio'
 import { useSettings } from '../composables/useSettings'
+import TrainingModeOverlay from '../components/TrainingModeOverlay.vue'
 // Type for methods exposed by GameCanvas via defineExpose
 type GameCanvasExposed = {
   pauseGame: () => void
@@ -293,6 +296,7 @@ const cameraPreviewScale = ref(0.5)
 const cameraPreviewAnchor = ref<'TopLeft' | 'TopRight' | 'BottomLeft' | 'BottomRight'>('TopRight')
 const cameraPreviewMargin = ref(12)
 const cameraPreviewMirror = ref(false)
+const showTrainingMode = ref(false)
 const anchorOptions = [
   { label: 'Top Left', value: 'TopLeft' },
   { label: 'Top Right', value: 'TopRight' },
@@ -710,13 +714,19 @@ const testVirtualCollar = async () => {
 
 const startTrainingMode = () => {
   showMenu.value = false
-  // Future: start vocabulary training mode
-  
-  $q.notify({
-    type: 'info',
-    message: '📚 Training mode coming soon!',
-    position: 'top'
-  })
+  showTrainingMode.value = true
+  gameCanvas.value?.pauseGame?.()
+}
+
+function onTrainingExit(reason?: 'timeout' | 'manual' | 'error') {
+  showTrainingMode.value = false
+  gameCanvas.value?.resumeGame?.()
+  showMenu.value = true
+  if (reason === 'timeout') {
+    $q.notify({ type: 'info', message: 'Training session complete', position: 'top', timeout: 2000 })
+  } else if (reason === 'error') {
+    $q.notify({ type: 'negative', message: 'Training mode ended due to an error', position: 'top', timeout: 2000 })
+  }
 }
 
 const exitGame = () => {

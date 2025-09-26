@@ -158,7 +158,7 @@ onUnmounted(() => {
 async function startJs() {
   status.value = 'Starting camera (JS)…'
   console.log('🎬 Starting camera service...')
-  await cameraService.start({ width: 640, height: 480, rear: true })
+  await cameraService.start({ width: 640, height: 480, rear: true, zoom: 0.25 })
   
   // Also start HTML canvas preview for development
   try {

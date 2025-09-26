@@ -92,7 +92,9 @@ export class CameraService {
   private running = false
   private width = 0
   private height = 0
+  private zoom = 1.0
   private captureHandle: number | null = null
+  private frameListeners = new Set<(frame: CameraFrame) => void>()
 
   // Web fallback
   private videoEl: HTMLVideoElement | null = null
@@ -102,7 +104,7 @@ export class CameraService {
   private pluginCanvas: HTMLCanvasElement | null = null
   private pluginCtx: CanvasRenderingContext2D | null = null
 
-  async start(opts?: { width?: number; height?: number; rear?: boolean }): Promise<void> {
+  async start(opts?: { width?: number; height?: number; rear?: boolean; toBack?: boolean; zoom?: number }): Promise<void> {
     if (this.running) {
       console.log('[CameraService] Already running, skipping start')
       return
@@ -112,15 +114,17 @@ export class CameraService {
     this.plugin = await loadCapacitorCameraPreview()
     this.width = opts?.width || 640
     this.height = opts?.height || 480
-    const rear = opts?.rear !== false
+    this.zoom = opts?.zoom ?? 1.0 // 1.0 = no zoom, < 1.0 = zoom out, > 1.0 = zoom in
+    const rear = opts?.rear === true
+    const toBack = opts?.toBack ?? true
     
-    console.log('[CameraService] Camera config:', { width: this.width, height: this.height, rear })
+    console.log('[CameraService] Camera config:', { width: this.width, height: this.height, rear, toBack, zoom: this.zoom })
 
     if (this.plugin) {
       console.log('[CameraService] Using Capacitor plugin for camera')
       try {
         const position: 'rear' | 'front' = rear ? 'rear' : 'front'
-        const startOptions = { position, toBack: true, width: this.width, height: this.height }
+        const startOptions = { position, toBack, width: this.width, height: this.height }
         console.log('[CameraService] Calling plugin.start with:', startOptions)
         
         await this.plugin.start(startOptions)
@@ -140,7 +144,7 @@ export class CameraService {
 
     // Web fallback
     console.log('[CameraService] Setting up web stream fallback')
-    await this.setupWebStream(this.width, this.height, rear)
+    await this.setupWebStream(this.width, this.height, rear, this.zoom)
     this.running = true
     this.startCaptureLoopWeb()
     console.log('[CameraService] Web camera started successfully')
@@ -165,6 +169,13 @@ export class CameraService {
     this.videoEl = null
     this.canvasEl = null
     this.ctx = null
+  }
+
+  addFrameListener(listener: (frame: CameraFrame) => void): () => void {
+    this.frameListeners.add(listener)
+    return () => {
+      this.frameListeners.delete(listener)
+    }
   }
 
   private startCaptureLoopCapacitor() {
@@ -209,7 +220,7 @@ export class CameraService {
     this.captureHandle = requestAnimationFrame(tick)
   }
 
-  private async setupWebStream(width: number, height: number, rear: boolean) {
+  private async setupWebStream(width: number, height: number, rear: boolean, zoom = 1.0) {
     // Create hidden elements
     const container = document.createElement('div')
     container.style.position = 'fixed'
@@ -239,6 +250,11 @@ export class CameraService {
         width: { ideal: width },
         height: { ideal: height },
         facingMode: rear ? { ideal: 'environment' } : { ideal: 'user' },
+        // For zoom out effect, request higher resolution and scale down
+        ...(zoom < 1.0 && {
+          width: { ideal: Math.round(width / zoom) },
+          height: { ideal: Math.round(height / zoom) }
+        })
       },
       audio: false,
     }
@@ -247,6 +263,11 @@ export class CameraService {
     await new Promise<void>((resolve) => {
       video.onloadedmetadata = () => resolve()
     })
+    try {
+      await video.play()
+    } catch (playError) {
+      console.warn('[CameraService] video.play() failed; continuing with fallback drawing', playError)
+    }
 
     this.videoEl = video
     this.canvasEl = canvas
@@ -259,7 +280,20 @@ export class CameraService {
       if (!this.running || !this.ctx || !this.canvasEl || !this.videoEl) return
       try {
         const { ctx, canvasEl, videoEl } = this
-        ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height)
+        
+        // Apply zoom by scaling the drawn area
+        if (this.zoom !== 1.0) {
+          const scaledWidth = canvasEl.width * this.zoom
+          const scaledHeight = canvasEl.height * this.zoom
+          const offsetX = (canvasEl.width - scaledWidth) / 2
+          const offsetY = (canvasEl.height - scaledHeight) / 2
+          
+          // Clear and draw scaled
+          ctx.clearRect(0, 0, canvasEl.width, canvasEl.height)
+          ctx.drawImage(videoEl, offsetX, offsetY, scaledWidth, scaledHeight)
+        } else {
+          ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height)
+        }
         const id = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height)
         // Convert RGBA -> RGB to reduce size and match expected format
         const rgba = id.data
@@ -351,6 +385,15 @@ export class CameraService {
   private emitFrame(frame: CameraFrame) {
     const wasm = window.__A4D_WASM__
     const submit = wasm?.submit_camera_frame
+    if (this.frameListeners.size > 0) {
+      for (const listener of Array.from(this.frameListeners)) {
+        try {
+          listener(frame)
+        } catch (error) {
+          console.error('[CameraService] Frame listener failed:', error)
+        }
+      }
+    }
     if (!submit) return
     try {
       submit(frame.width, frame.height, frame.data, frame.ts)
