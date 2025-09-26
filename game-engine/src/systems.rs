@@ -323,7 +323,7 @@ pub fn monitor_asset_loading(
                 None => console_log!("🧭 Selected sprite: (no status) {}", url),
             }
         } else {
-            console_log!("🧭 No selected critter sprite to monitor yet.");
+            // console_log!("🧭 No selected critter sprite to monitor yet.");
         }
     }
 }

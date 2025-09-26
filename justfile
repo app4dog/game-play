@@ -86,8 +86,15 @@ install-apk:
     fi
     @echo "🔍 Checking for connected Android devices..."
     @adb devices
+    @echo "🔍 Checking for existing app installation..."
+    @if adb shell pm list packages | grep -q "dog.app4.game"; then \
+        echo "📦 Found existing installation, uninstalling first..."; \
+        adb uninstall dog.app4.game || echo "⚠️ Uninstall failed (app may not be installed)"; \
+    else \
+        echo "✅ No existing installation found"; \
+    fi
     @echo "📦 Installing app4dog-game.apk..."
-    @adb install -r android-build-output/app4dog-game.apk
+    @adb install android-build-output/app4dog-game.apk
     @echo "✅ APK installed successfully!"
 
 # Uninstall the app from connected device
