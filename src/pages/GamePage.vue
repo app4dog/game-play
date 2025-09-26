@@ -202,6 +202,15 @@
             @click="showDebugPanel = true"
             class="full-width q-mt-sm"
           />
+          <q-btn
+            v-if="isNativePlatform"
+            color="negative"
+            label="Exit Game"
+            size="md"
+            @click="exitGame"
+            class="full-width q-mt-sm"
+            outline
+          />
         </q-card-section>
       </q-card>
     </q-dialog>
@@ -227,6 +236,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
+import { Capacitor } from '@capacitor/core'
 import GameCanvas from '../components/GameCanvas.vue'
 import { useBevyEventBridge } from '../composables/useBevyEventBridge'
 import { useNativeAudio } from '../composables/useNativeAudio'
@@ -264,6 +274,9 @@ import { bluetoothService } from '../services/BluetoothService'
 import type { GameEngine as ExtendedGameEngine } from '../types/wasm-types'
 
 const $q = useQuasar()
+
+// Platform detection
+const isNativePlatform = Capacitor.isNativePlatform()
 
 // Game state
 const gameLoading = ref(true)
@@ -703,6 +716,34 @@ const startTrainingMode = () => {
     type: 'info',
     message: '📚 Training mode coming soon!',
     position: 'top'
+  })
+}
+
+const exitGame = () => {
+  // Stop the game and clean up
+  gameCanvas.value?.stopBackgroundMusic?.()
+  gameCanvas.value?.pauseGame()
+  
+  // Show confirmation dialog for mobile app exit
+  $q.dialog({
+    title: 'Exit Game',
+    message: 'Are you sure you want to exit the game?',
+    cancel: true,
+    persistent: false
+  }).onOk(() => {
+    // Import and use Capacitor App plugin
+    import('@capacitor/app')
+      .then(({ App }) => App.exitApp())
+      .catch((error) => {
+        console.warn('Failed to exit app via Capacitor:', error)
+        // Fallback - just return to menu
+        showMenu.value = true
+        $q.notify({
+          type: 'info',
+          message: '🏠 Returned to main menu',
+          position: 'top'
+        })
+      })
   })
 }
 
